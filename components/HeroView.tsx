@@ -681,7 +681,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 mb-2">
                 {combatLog.length === 0 && <div className="text-slate-600 italic">It is quiet... too quiet.</div>}
                 {combatLog.map((log, i) => (
-                    <div key={i} className="text-slate-300 border-b border-slate-800 pb-1">> {log}</div>
+                    <div key={i} className="text-slate-300 border-b border-slate-800 pb-1">&gt; {log}</div>
                 ))}
             </div>
             {/* REMOVED OLD ENCOUNTER BLOCK FROM HERE */}
