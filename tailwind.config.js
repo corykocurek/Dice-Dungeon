@@ -6,6 +6,19 @@ export default {
     "./components/**/*.{js,ts,jsx,tsx}",
     "./utils/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    // Explicitly safelist stat colors used in constants.ts
+    'bg-red-500', 'text-red-500', 'border-red-500',
+    'bg-yellow-400', 'text-yellow-400', 'border-yellow-400',
+    'bg-orange-500', 'text-orange-500', 'border-orange-500',
+    'bg-blue-400', 'text-blue-400', 'border-blue-400',
+    'bg-purple-400', 'text-purple-400', 'border-purple-400',
+    'bg-pink-400', 'text-pink-400', 'border-pink-400',
+    // Common utility colors that might be dynamic
+    'bg-green-500', 'text-green-500', 'border-green-500',
+    'bg-slate-900', 'bg-slate-800', 'bg-slate-700',
+    'text-slate-200', 'text-slate-400',
+  ],
   theme: {
     extend: {
       fontFamily: {

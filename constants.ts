@@ -1,3 +1,4 @@
+
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
 
@@ -22,6 +23,7 @@ export const STAT_COLORS: Record<StatType, string> = {
   [StatType.LOOKS]: 'text-pink-400 border-pink-400',
 };
 
+// Explicit background colors to ensure Tailwind includes them
 export const STAT_BG_COLORS: Record<StatType, string> = {
   [StatType.MUSCLE]: 'bg-red-500',
   [StatType.AGILITY]: 'bg-yellow-400',
@@ -188,6 +190,17 @@ export const generateStandardDie = (id: string): Die => {
   return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
 };
 
+export const generateBalancedDie = (id: string): Die => {
+  // Always has exactly one of each stat
+  const faces = Object.values(StatType);
+  const multipliers = [1, 1, 1, 1, 1, 1];
+  
+  const currentValue = faces[Math.floor(Math.random() * faces.length)];
+  return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+};
+
 export const generateStarterDice = (): Die[] => {
-  return [generateStandardDie('d1'), generateStandardDie('d2')];
+  // First die is always balanced (1 of each face)
+  // Second die is standard (random faces)
+  return [generateBalancedDie('d1'), generateStandardDie('d2')];
 };
