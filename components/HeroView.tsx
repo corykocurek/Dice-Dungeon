@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { GameState, Player, Room, Die, StatType, RoomObstacle } from '../types';
 import { Room3D } from './Room3D';
 import { RetroButton, Panel, ProgressBar } from './RetroComponents';
-import { STAT_COLORS, STAT_BG_COLORS, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, MAP_SIZE, ITEM_REGISTRY } from '../constants';
+import { STAT_COLORS, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, MAP_SIZE, ITEM_REGISTRY } from '../constants';
 import { Dices, Activity, Map as MapIcon, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Ban, RefreshCw, Zap, Lock, Unlock, Undo2, X, Sword, SquareStack, Star, Key, Backpack, Grid3X3, ChevronDown, ChevronUp, Trash2, Info, Sparkles, CheckCircle, DoorOpen } from 'lucide-react';
 
 interface HeroProps {
@@ -435,7 +435,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                  return (
                                      <div key={stat} className="flex items-center gap-2">
                                          <span className="text-[10px] font-bold w-16 text-right uppercase text-slate-400 tracking-tighter">{stat}</span>
-                                         <div className={`w-3 h-3 rounded-full shrink-0 ${STAT_BG_COLORS[stat]}`}></div>
+                                         <div className={`w-3 h-3 rounded-full shrink-0 ${STAT_COLORS[stat].split(' ')[0].replace('text', 'bg')}`}></div>
                                          <div className="flex-1 min-w-[60px]">
                                              <ProgressBar value={current} max={required} color="bg-green-500" />
                                          </div>
@@ -508,7 +508,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                             ${isAnimating ? 'animate-tumble' : ''}`}>
                                             
                                             {isLocked && <Lock className="w-5 h-5 text-slate-400 absolute z-10" />}
-                                            <div className={`w-6 h-6 rounded-full ${STAT_BG_COLORS[die.currentValue]}`}></div>
+                                            <div className={`w-6 h-6 rounded-full ${STAT_COLORS[die.currentValue].split(' ')[0].replace('text', 'bg')}`}></div>
                                             {multiplier > 1 && (
                                                 <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border border-white">
                                                     x{multiplier}
@@ -555,7 +555,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                                         bg-slate-900
                                                     `}
                                                  >
-                                                    <div className={`w-3 h-3 rounded-full ${STAT_BG_COLORS[face]}`}></div>
+                                                    <div className={`w-3 h-3 rounded-full ${STAT_COLORS[face].split(' ')[0].replace('text', 'bg')}`}></div>
                                                     <div className="text-[6px] uppercase text-center w-full truncate">{face}</div>
                                                     {mult > 1 && <span className="absolute top-0 right-0 text-[8px] font-bold bg-yellow-500 text-black px-1 rounded-sm">x{mult}</span>}
                                                     {canUpgrade && <div className="absolute inset-0 bg-yellow-500/10 flex items-center justify-center animate-pulse">
@@ -684,6 +684,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                     <div key={i} className="text-slate-300 border-b border-slate-800 pb-1">&gt; {log}</div>
                 ))}
             </div>
+            {/* REMOVED OLD ENCOUNTER BLOCK FROM HERE */}
         </Panel>
 
       </div>

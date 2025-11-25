@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { HeroClass, PlayerRole, Player, StatType } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
 import { Shield, Zap, Book, Cross, Users, Copy, Radio, ArrowRight, Library, Search, ChevronLeft, Axe, Music, Brain } from 'lucide-react';
-import { ITEM_REGISTRY, OBSTACLE_DECK, STAT_COLORS, STAT_BG_COLORS } from '../constants';
+import { ITEM_REGISTRY, OBSTACLE_DECK, STAT_COLORS } from '../constants';
 
 interface LobbyProps {
   players: Player[];
@@ -175,7 +175,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                                           <div className="flex flex-col gap-0.5 mt-1">
                                               {(Object.entries(obs.requirements) as [StatType, number][]).map(([stat, req]) => (
                                                   <div key={stat} className="flex gap-1 items-center bg-black/40 p-0.5 px-1 rounded">
-                                                      <div className={`w-1.5 h-1.5 rounded-full ${STAT_BG_COLORS[stat]}`}></div>
+                                                      <div className={`w-1.5 h-1.5 rounded-full ${STAT_COLORS[stat].split(' ')[0].replace('text', 'bg')}`}></div>
                                                       <span className="text-[10px] text-white">{req} {stat}</span>
                                                   </div>
                                               ))}

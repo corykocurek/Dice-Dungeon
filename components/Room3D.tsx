@@ -1,8 +1,9 @@
 
+
 import React from 'react';
 import { RoomObstacle, StatType } from '../types';
 import { Monster, Lock, Skull, Ghost, RefreshCw, Link2, Key } from 'lucide-react';
-import { STAT_COLORS, STAT_BG_COLORS, RED_KEY_ID, ITEM_REGISTRY } from '../constants';
+import { STAT_COLORS, RED_KEY_ID, ITEM_REGISTRY } from '../constants';
 import { ASSETS } from '../assets';
 
 interface Room3DProps {
@@ -79,9 +80,9 @@ export const Room3D: React.FC<Room3DProps> = ({ obstacles, isExit, isStart, item
                                     const current = obs.currentSuccesses[stat] || 0;
                                     return (
                                         <div key={stat} className="flex gap-1 justify-center items-center">
-                                             <div className={`w-2 h-2 rounded-full ${STAT_BG_COLORS[stat]}`}></div>
+                                             <div className={`w-2 h-2 rounded-full ${STAT_COLORS[stat].split(' ')[0].replace('text', 'bg')}`}></div>
                                              {Array.from({length: required}).map((_, i) => (
-                                                 <div key={i} className={`w-3 h-3 rounded-sm border border-slate-600 ${i < current ? STAT_BG_COLORS[stat] : 'bg-slate-800'}`}></div>
+                                                 <div key={i} className={`w-3 h-3 rounded-sm border border-slate-600 ${i < current ? STAT_COLORS[stat].split(' ')[0].replace('text', 'bg') : 'bg-slate-800'}`}></div>
                                              ))}
                                         </div>
                                     )
