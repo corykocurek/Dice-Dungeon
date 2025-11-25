@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { GameState, Room, ObstacleCard, Player, StatType, HeroClass } from '../types';
+import { GameState, Room, ObstacleCard, Player, StatType, HeroClass, PlayerRole } from '../types';
 import { Panel, RetroButton, ProgressBar } from './RetroComponents';
 import { MAP_SIZE, OBSTACLE_DECK, STAT_COLORS, RED_KEY_ID, RED_DOOR_CARD, RESOURCE_TICK_INTERVAL } from '../constants';
 import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music } from 'lucide-react';
@@ -76,6 +76,12 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
 
   const inspectedRoom = inspectRoomId ? gameState.map[inspectRoomId] : null;
 
+  // Sort rooms for correct grid rendering (Row-major: Y then X)
+  const sortedRooms = Object.values(gameState.map).sort((a: Room, b: Room) => {
+      if (a.y !== b.y) return a.y - b.y;
+      return a.x - b.x;
+  });
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
         {/* Header */}
@@ -99,8 +105,9 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
             {/* Map Area */}
             <div className="flex-1 bg-black p-4 flex items-center justify-center relative overflow-auto shadow-inner">
                  <div className="grid gap-0 border border-slate-900" style={{ gridTemplateColumns: `repeat(${MAP_SIZE}, minmax(0, 1fr))` }}>
-                    {Object.values(gameState.map).map((room: Room) => {
-                        const playersInRoom = gameState.players.filter(p => p.currentRoomId === room.id);
+                    {sortedRooms.map((room: Room) => {
+                        // Filter OUT the DM from the players visible on the map
+                        const playersInRoom = gameState.players.filter(p => p.currentRoomId === room.id && p.role !== PlayerRole.DM);
                         const hasTraps = room.activeObstacles.length > 0;
                         const hasKey = room.items.includes(RED_KEY_ID);
                         const hasRedDoor = room.activeObstacles.some(o => o.card.keyRequirement === RED_KEY_ID);
@@ -232,10 +239,10 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                         </div>
                         
                         {/* Players Here */}
-                        {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id).length > 0 && (
+                        {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id && p.role !== PlayerRole.DM).length > 0 && (
                             <div className="space-y-1">
                                 <div className="text-[10px] uppercase text-slate-500">Heroes</div>
-                                {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id).map(p => (
+                                {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id && p.role !== PlayerRole.DM).map(p => (
                                     <div key={p.id} className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/20 p-1 rounded border border-blue-800">
                                         {p.heroClass && React.createElement(CLASS_ICONS[p.heroClass], { className: "w-3 h-3" })}
                                         <span>{p.name}</span>
@@ -288,7 +295,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                                     <RefreshCw className="w-3 h-3" /> REGEN
                                                 </div>
                                             )}
-                                            {obs.card.specialRules.reward && (
+                                            {card.specialRules.reward && (
                                                 <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold">
                                                     <Gift className="w-3 h-3" /> LOOT
                                                 </div>
