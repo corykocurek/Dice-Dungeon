@@ -82,7 +82,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                     <div className="text-2xl font-mono text-yellow-400">{gameState.dmResources}/10</div>
                 </div>
                 <div className="w-24 md:w-32">
-                    <ProgressBar value={visualMana} max={10} color="bg-yellow-500" animate={false} transition={false} />
+                    <ProgressBar value={visualMana} max={10} color="bg-yellow-500" animate={false} />
                 </div>
             </div>
         </header>

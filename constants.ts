@@ -1,5 +1,3 @@
-
-
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
 
@@ -22,6 +20,15 @@ export const STAT_COLORS: Record<StatType, string> = {
   [StatType.KNOWLEDGE]: 'text-blue-400 border-blue-400',
   [StatType.SMARTS]: 'text-purple-400 border-purple-400',
   [StatType.LOOKS]: 'text-pink-400 border-pink-400',
+};
+
+export const STAT_BG_COLORS: Record<StatType, string> = {
+  [StatType.MUSCLE]: 'bg-red-500',
+  [StatType.AGILITY]: 'bg-yellow-400',
+  [StatType.FORTITUDE]: 'bg-orange-500',
+  [StatType.KNOWLEDGE]: 'bg-blue-400',
+  [StatType.SMARTS]: 'bg-purple-400',
+  [StatType.LOOKS]: 'bg-pink-400',
 };
 
 export const CLASS_BONUS: Record<HeroClass, StatType> = {
