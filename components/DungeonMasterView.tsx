@@ -295,7 +295,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                                     <RefreshCw className="w-3 h-3" /> REGEN
                                                 </div>
                                             )}
-                                            {card.specialRules.reward && (
+                                            {obs.card.specialRules.reward && (
                                                 <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold">
                                                     <Gift className="w-3 h-3" /> LOOT
                                                 </div>
