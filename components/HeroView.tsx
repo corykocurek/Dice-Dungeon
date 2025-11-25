@@ -301,14 +301,14 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
             </div>
         </div>
 
-        {/* Success Popup */}
+        {/* Success Popup (Fixed Positioning for Mobile) */}
         {successMsg && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] animate-bounce-slow pointer-events-none">
-                 <div className="bg-green-900/90 border-2 border-green-500 p-4 rounded-xl shadow-2xl flex items-center gap-2">
-                     <CheckCircle className="w-8 h-8 text-green-300" />
-                     <div className="flex flex-col">
-                         <span className="text-green-300 font-retro text-lg">SUCCESS!</span>
-                         <span className="text-green-100 text-xs">Defeated {successMsg.name}</span>
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-bounce-slow pointer-events-none w-[90%] max-w-sm">
+                 <div className="bg-green-900/90 border-2 border-green-500 p-4 rounded-xl shadow-2xl flex items-center gap-2 justify-center backdrop-blur-md">
+                     <CheckCircle className="w-8 h-8 text-green-300 shrink-0" />
+                     <div className="flex flex-col overflow-hidden">
+                         <span className="text-green-300 font-retro text-lg leading-tight">SUCCESS!</span>
+                         <span className="text-green-100 text-xs truncate w-full">Defeated {successMsg.name}</span>
                      </div>
                  </div>
             </div>

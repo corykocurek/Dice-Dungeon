@@ -1,15 +1,23 @@
 
-
 import React, { useEffect, useState } from 'react';
-import { GameState, Room, ObstacleCard, Player, StatType } from '../types';
+import { GameState, Room, ObstacleCard, Player, StatType, HeroClass } from '../types';
 import { Panel, RetroButton, ProgressBar } from './RetroComponents';
 import { MAP_SIZE, OBSTACLE_DECK, STAT_COLORS, RED_KEY_ID, RED_DOOR_CARD, RESOURCE_TICK_INTERVAL } from '../constants';
-import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift } from 'lucide-react';
+import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music } from 'lucide-react';
 
 interface DMProps {
   gameState: GameState;
   onPlaceCard: (card: ObstacleCard, roomId: string) => void;
 }
+
+const CLASS_ICONS: Record<HeroClass, React.ElementType> = {
+    [HeroClass.FIGHTER]: Shield,
+    [HeroClass.ROGUE]: Zap,
+    [HeroClass.WIZARD]: Book,
+    [HeroClass.CLERIC]: Cross,
+    [HeroClass.BARBARIAN]: Axe,
+    [HeroClass.BARD]: Music,
+};
 
 export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard }) => {
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
@@ -48,7 +56,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
 
       frameId = requestAnimationFrame(animate);
       return () => cancelAnimationFrame(frameId);
-  }, []); // Run once on mount, loop reads from ref
+  }, []); 
 
 
   const handleRoomClick = (roomId: string) => {
@@ -58,7 +66,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
         if (card) {
             onPlaceCard(card, roomId);
             setSelectedCardId(null);
-            setInspectRoomId(null); // Clear inspection if we placed
+            setInspectRoomId(null); 
         }
     } else {
         // Otherwise, inspect the room
@@ -107,89 +115,111 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
 
                         const isSelected = inspectRoomId === room.id;
                         
-                        // Cannot place if: Players here OR already has a trap
+                        // Interaction Logic
                         const isBlocked = playersInRoom.length > 0 || hasTraps;
+                        const canInteract = selectedCardId ? !isBlocked : true;
+
+                        // Base Room Colors
+                        let roomBg = "bg-slate-800";
+                        if (room.isStart) roomBg = "bg-green-900";
+                        if (room.isExit) roomBg = "bg-yellow-900";
+                        if (isSelected) roomBg = "bg-slate-600 ring-2 ring-yellow-400";
+                        
+                        // Corridor Color (matches room unless special)
+                        const corridorColor = "bg-slate-800";
 
                         return (
                             <button
                                 key={room.id}
                                 onClick={() => handleRoomClick(room.id)}
-                                disabled={selectedCardId && isBlocked} 
+                                disabled={selectedCardId ? isBlocked : false} 
                                 className={`
                                     w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 
-                                    relative transition-all group outline-none
-                                    ${selectedCardId && !isBlocked ? 'hover:bg-red-900/20 cursor-crosshair' : ''}
-                                    ${selectedCardId && isBlocked ? 'bg-red-900/10 cursor-not-allowed opacity-50' : ''}
-                                    ${!selectedCardId && !isBlocked ? 'hover:bg-slate-900/50' : ''}
+                                    relative outline-none bg-black
+                                    ${selectedCardId && !isBlocked ? 'hover:bg-red-900/10 cursor-crosshair' : ''}
+                                    ${selectedCardId && isBlocked ? 'cursor-not-allowed opacity-50' : ''}
                                 `}
                             >
-                                {/* Grid Lines (Faint) */}
-                                <div className="absolute inset-0 border border-slate-900/50 pointer-events-none z-20"></div>
+                                {/* Grid Lines (Faint) - Z-0 (Bottom) */}
+                                <div className="absolute inset-0 border border-slate-900/50 pointer-events-none z-0"></div>
 
-                                {/* PATH CONNECTIONS - Extended significantly to ensure overlaps and prevent gaps */}
-                                {/* Using z-0 to be behind the center node but on top of base bg */}
-                                <div className="absolute inset-0 pointer-events-none z-0">
-                                    {hasNorth && <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[60%] h-[60%] bg-slate-800"></div>}
-                                    {hasSouth && <div className="absolute bottom-[-10%] left-1/2 -translate-x-1/2 w-[60%] h-[60%] bg-slate-800"></div>}
-                                    {hasWest && <div className="absolute left-[-10%] top-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-slate-800"></div>}
-                                    {hasEast && <div className="absolute right-[-10%] top-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-slate-800"></div>}
-                                </div>
+                                {/* --- LAYER 1: CORRIDORS (Z-10) --- */}
+                                {/* These extend from the center to the edge. If neighbors match, they form a solid line. */}
+                                
+                                {hasNorth && (
+                                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>
+                                )}
+                                {hasSouth && (
+                                    <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>
+                                )}
+                                {hasWest && (
+                                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>
+                                )}
+                                {hasEast && (
+                                    <div className={`absolute right-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>
+                                )}
 
-                                {/* CENTER NODE (ROOM) - Solid background to cover intersection of lines */}
+                                {/* --- LAYER 2: ROOM NODE (Z-20) --- */}
+                                {/* Sits on top of the corridors to cover the intersection */}
                                 <div className={`
-                                    absolute inset-1.5 rounded-sm flex items-center justify-center z-10 transition-colors
-                                    ${room.isStart ? 'bg-green-900 border border-green-700' : 
-                                      room.isExit ? 'bg-yellow-900 border border-yellow-700' : 
-                                      'bg-slate-800'}
-                                    ${isSelected ? 'ring-2 ring-yellow-400 bg-slate-700' : ''}
+                                    absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                                    w-[70%] h-[70%] z-20 rounded-sm transition-colors flex items-center justify-center
+                                    ${roomBg}
+                                    ${hasTraps && !isBlocked ? 'border border-red-500' : ''}
                                 `}>
-                                    {/* Coordinates */}
-                                    <div className="absolute top-0 left-0.5 text-[6px] md:text-[8px] text-slate-500 font-mono leading-none">{x},{y}</div>
-                                    
-                                    {/* Key Indicator */}
-                                    {hasKey && (
-                                        <div className="absolute top-0 right-0 p-0.5 z-20 animate-pulse">
-                                            <Key className="w-3 h-3 md:w-4 md:h-4 text-yellow-400 fill-yellow-400" />
-                                        </div>
-                                    )}
-
-                                    {/* Red Door Indicator */}
-                                    {hasRedDoor && !hasKey && (
-                                        <div className="absolute top-0 right-0 p-0.5 z-20">
-                                            <DoorOpen className="w-3 h-3 md:w-4 md:h-4 text-red-500 fill-red-900" />
-                                        </div>
-                                    )}
-
-                                    {/* Players */}
-                                    {playersInRoom.length > 0 && (
-                                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                                            {playersInRoom.map(p => (
-                                                <div key={p.id} className="w-2 h-2 md:w-3 md:h-3 bg-blue-400 rounded-full border border-white shadow-sm" title={p.name}></div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Traps */}
-                                    {hasTraps && playersInRoom.length === 0 && (
-                                        <div className="absolute bottom-1 right-1 flex gap-0.5 flex-wrap justify-end max-w-full">
-                                            {room.activeObstacles.map(obs => (
-                                                 <div key={obs.id} className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-sm ${obs.isDefeated ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    
                                     {/* Start/Exit Label */}
-                                    {room.isStart && playersInRoom.length === 0 && <span className="text-[8px] font-bold text-green-300">START</span>}
-                                    {room.isExit && playersInRoom.length === 0 && <span className="text-[8px] font-bold text-yellow-300">EXIT</span>}
+                                    {room.isStart && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-green-300">START</span>}
+                                    {room.isExit && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-yellow-300">EXIT</span>}
                                 </div>
+
+                                {/* --- LAYER 3: CONTENT & ICONS (Z-30) --- */}
+                                <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                                     {/* Coordinates */}
+                                     <div className="absolute top-0.5 left-0.5 text-[6px] text-slate-500 font-mono leading-none opacity-50">{x},{y}</div>
+                                    
+                                     {/* Key Indicator */}
+                                     {hasKey && <Key className="absolute top-0.5 right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 text-yellow-400 fill-yellow-400 animate-pulse" />}
+                                     
+                                     {/* Red Door Indicator */}
+                                     {hasRedDoor && !hasKey && <DoorOpen className="absolute top-0.5 right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 text-red-500 fill-red-900" />}
+
+                                     {/* Center Content: Players */}
+                                     {playersInRoom.length > 0 && (
+                                         <div className="flex gap-0.5 flex-wrap justify-center items-center max-w-[80%] bg-black/40 rounded p-0.5 backdrop-blur-sm border border-white/20">
+                                             {playersInRoom.map(p => {
+                                                 const Icon = p.heroClass ? CLASS_ICONS[p.heroClass] : User;
+                                                 return (
+                                                     <div key={p.id} className="relative group" title={p.name}>
+                                                         <Icon className="w-3 h-3 md:w-4 md:h-4 text-blue-300 drop-shadow-sm" />
+                                                     </div>
+                                                 );
+                                             })}
+                                         </div>
+                                     )}
+
+                                     {/* Traps (Bottom Right) */}
+                                     {hasTraps && playersInRoom.length === 0 && (
+                                         <div className="absolute bottom-1 right-1 flex gap-0.5">
+                                             {room.activeObstacles.map(obs => (
+                                                 <div key={obs.id} className={`w-1.5 h-1.5 rounded-sm ${obs.isDefeated ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                             ))}
+                                         </div>
+                                     )}
+                                </div>
+                                
+                                {/* Hover Effect for Invalid Placement */}
+                                {selectedCardId && isBlocked && (
+                                    <div className="absolute inset-0 bg-red-900/30 z-40 flex items-center justify-center">
+                                        <Ban className="text-red-500 w-4 h-4" />
+                                    </div>
+                                )}
                             </button>
                         );
                     })}
                  </div>
             </div>
 
-            {/* Side Panel: Hand AND Room Inspection */}
-            {/* Added overflow-y-scroll to always show scrollbar track to prevent jumping */}
+            {/* Side Panel */}
             <div className="w-full md:w-80 bg-slate-900 border-t-4 md:border-t-0 md:border-l-4 border-slate-700 flex flex-col shrink-0 overflow-y-scroll">
                 <div className="p-4 flex flex-col gap-4 min-h-full">
                 
@@ -201,6 +231,19 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                             <button onClick={() => setInspectRoomId(null)}><X className="w-4 h-4 text-slate-400 hover:text-white"/></button>
                         </div>
                         
+                        {/* Players Here */}
+                        {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id).length > 0 && (
+                            <div className="space-y-1">
+                                <div className="text-[10px] uppercase text-slate-500">Heroes</div>
+                                {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id).map(p => (
+                                    <div key={p.id} className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/20 p-1 rounded border border-blue-800">
+                                        {p.heroClass && React.createElement(CLASS_ICONS[p.heroClass], { className: "w-3 h-3" })}
+                                        <span>{p.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Obstacles */}
                         <div className="space-y-2">
                             <div className="text-[10px] uppercase text-slate-500">Obstacles</div>
