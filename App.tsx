@@ -97,6 +97,8 @@ export default function App() {
   // --- Networking ---
   const initPeer = () => {
     if (peerRef.current) return;
+    
+    // Create Peer instance
     const peer = new Peer(); 
     
     peer.on('open', (id: string) => {
@@ -104,7 +106,14 @@ export default function App() {
       setPeerId(id);
     });
 
+    peer.on('error', (err: any) => {
+        console.error("PeerJS Error:", err);
+        // Optional: Handle specific errors like 'unavailable-id'
+    });
+
     peer.on('connection', (conn: any) => {
+      console.log("Incoming connection from:", conn.peer);
+      
       conn.on('data', (data: NetworkMessage) => {
         if (data.type === 'JOIN_REQUEST') {
           handlePlayerJoin(data.payload);
@@ -112,8 +121,10 @@ export default function App() {
           handleGameAction(data.payload);
         }
       });
+      
       conn.on('open', () => {
         connectionsRef.current.push(conn);
+        // Send initial state immediately upon connection
         conn.send({ type: 'SYNC_STATE', payload: gameState });
       });
     });
@@ -123,10 +134,12 @@ export default function App() {
 
   const connectToHost = (hostId: string) => {
     if (peerRef.current) {
+        console.log(`Connecting to host: ${hostId}...`);
         const conn = peerRef.current.connect(hostId);
         hostConnectionRef.current = conn;
 
         conn.on('open', () => {
+             console.log("Connected to host!");
              const tempProfile = tempProfileRef.current;
              const joinReq: Player = {
                  id: peerRef.current.id,
@@ -155,13 +168,31 @@ export default function App() {
                 }));
             }
         });
+
+        conn.on('error', (err: any) => {
+            console.error("Connection error:", err);
+            alert(`Could not connect to host: ${err.type || 'Unknown Error'}`);
+        });
+        
+        conn.on('close', () => {
+            alert("Disconnected from host.");
+            window.location.reload();
+        });
+    } else {
+        console.error("Peer not initialized");
+        alert("Network not ready. Please wait.");
     }
   };
 
   useEffect(() => {
     initPeer();
+    // CRITICAL FIX: Properly cleanup peer reference on unmount
+    // This prevents the "stale peer" issue in React StrictMode
     return () => {
-      peerRef.current?.destroy();
+      if (peerRef.current) {
+          peerRef.current.destroy();
+          peerRef.current = null;
+      }
     };
   }, []);
 
@@ -184,10 +215,14 @@ export default function App() {
             }
         }
 
+        // Avoid duplicates
+        const filteredPlayers = prev.players.filter(p => p.id !== newPlayer.id);
         const newState = {
             ...prev,
-            players: [...prev.players.filter(p => p.id !== newPlayer.id), playerToAdd]
+            players: [...filteredPlayers, playerToAdd]
         };
+        
+        // Broadcast immediately to update everyone's lobby list
         broadcastState(newState);
         return newState;
     });

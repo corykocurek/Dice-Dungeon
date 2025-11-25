@@ -7,6 +7,43 @@ const r = (x: number, y: number, w: number, h: number, c: string) =>
   `<rect x='${x}' y='${y}' width='${w}' height='${h}' fill='${c.replace('#', '%23')}'/>`;
 
 export const ASSETS = {
+  // --- LOGO OPTIONS ---
+  
+  // OPTION 1: Elemental Die (Isometric cube with Red/Blue/Yellow faces)
+  LOGO_OPTION_1: HEADER +
+    r(8,0,8,8,'#e00') + // Top-Right Face (Red/Muscle) - representing Isometric Top roughly
+    r(0,4,8,8,'#fa0') + // Left Face (Yellow/Agility)
+    r(8,8,8,8,'#00e') + // Right Face (Blue/Knowledge)
+    r(0,4,1,8,'#fff') + r(8,0,1,16,'#fff') + r(0,4,16,1,'#fff') + // White highlight lines
+    r(4,7,2,2,'#fff') + // Dot left
+    r(11,3,2,2,'#fff') + // Dot top
+    r(11,11,2,2,'#fff') + // Dot right
+    FOOTER,
+
+  // OPTION 2: The Dungeon Gate (Ominous Arch)
+  LOGO_OPTION_2: HEADER +
+    r(2,2,12,14,'#444') + // Stone Arch Bg
+    r(4,6,8,10,'#000') + // Void Entrance
+    r(1,14,14,2,'#222') + // Step
+    r(3,2,1,12,'#777') + r(12,2,1,12,'#777') + // Highlights
+    r(0,6,2,4,'#a50') + r(14,6,2,4,'#a50') + // Torches holder
+    r(0,4,2,2,'#fa0') + r(14,4,2,2,'#fa0') + // Torch flame
+    r(1,3,1,1,'#fb0') + r(15,3,1,1,'#fb0') + // Flame tip
+    r(6,8,2,2,'#a00') + r(8,8,2,2,'#a00') + // Red eyes in dark
+    FOOTER,
+
+  // OPTION 3: The Dice Gate (Entrance shaped like a die face)
+  LOGO_OPTION_3: HEADER +
+    r(2,2,12,12,'#eee') + // Die Face (White)
+    r(2,2,12,1,'#ccc') + r(2,2,1,12,'#ccc') + // Shading
+    r(4,8,8,6,'#000') + // Doorway
+    r(4,4,2,2,'#000') + r(10,4,2,2,'#000') + // Top Pips
+    r(2,14,12,2,'#333') + // Step
+    r(6,10,1,2,'#500') + r(9,10,1,2,'#500') + // Red eyes inside
+    FOOTER,
+
+  // --- EXISTING ASSETS ---
+
   // 1. SPIKED PIT: Dark hole with grey spikes
   SPIKED_PIT: HEADER +
     r(0,0,16,16,'#1a1a1a') + // bg

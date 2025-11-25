@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { HeroClass, PlayerRole, Player, StatType } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
 import { Shield, Zap, Book, Cross, Users, Copy, Radio, ArrowRight, Library, Search, ChevronLeft, Axe, Music, Brain } from 'lucide-react';
 import { ITEM_REGISTRY, OBSTACLE_DECK, STAT_COLORS, STAT_BG_COLORS } from '../constants';
+import { ASSETS } from '../assets';
 
 interface LobbyProps {
   players: Player[];
@@ -36,11 +36,13 @@ export const Lobby: React.FC<LobbyProps> = ({
   // Local selection state for when in the room
   const [selectedRole, setSelectedRole] = useState<PlayerRole>(PlayerRole.HERO);
   const [selectedClass, setSelectedClass] = useState<HeroClass>(HeroClass.FIGHTER);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // If we have a local player ID and players list is populated, we are in the room
   React.useEffect(() => {
     if (localPlayerId && players.length > 0) {
       setView('ROOM');
+      setIsConnecting(false);
     }
   }, [localPlayerId, players]);
 
@@ -64,6 +66,29 @@ export const Lobby: React.FC<LobbyProps> = ({
   if (view === 'MENU') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 gap-6 animate-in fade-in duration-500">
+        
+        {/* LOGO OPTIONS PREVIEW - TEMPORARY FOR SELECTION */}
+        <div className="flex flex-wrap justify-center gap-8 mb-4">
+            <div className="flex flex-col items-center gap-2">
+                <div className="w-24 h-24 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                    <img src={ASSETS.LOGO_OPTION_1} className="w-full h-full [image-rendering:pixelated]" alt="Logo 1" />
+                </div>
+                <span className="text-[10px] text-slate-500">OPTION 1</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+                <div className="w-24 h-24 drop-shadow-[0_0_15px_rgba(255,0,0,0.3)]">
+                    <img src={ASSETS.LOGO_OPTION_2} className="w-full h-full [image-rendering:pixelated]" alt="Logo 2" />
+                </div>
+                <span className="text-[10px] text-slate-500">OPTION 2</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+                <div className="w-24 h-24 drop-shadow-[0_0_15px_rgba(255,255,0,0.3)]">
+                    <img src={ASSETS.LOGO_OPTION_3} className="w-full h-full [image-rendering:pixelated]" alt="Logo 3" />
+                </div>
+                <span className="text-[10px] text-slate-500">OPTION 3</span>
+            </div>
+        </div>
+
         <h1 className="text-4xl md:text-6xl text-yellow-400 font-retro text-center drop-shadow-[4px_4px_0_rgba(0,0,0,1)]">
           DICE DUNGEON
         </h1>
@@ -255,13 +280,16 @@ export const Lobby: React.FC<LobbyProps> = ({
             <RetroButton variant="outline" onClick={() => setView('MENU')}>Back</RetroButton>
             <RetroButton 
               className="flex-1" 
-              disabled={!joinCode || !name}
+              disabled={!joinCode || !name || isConnecting}
               onClick={() => {
+                setIsConnecting(true);
                 onUpdatePlayer(PlayerRole.HERO, HeroClass.FIGHTER, name);
                 onJoinGame(joinCode);
+                // Timeout to reset connecting state if it fails silently
+                setTimeout(() => setIsConnecting(false), 15000);
               }}
             >
-              CONNECT
+              {isConnecting ? 'CONNECTING...' : 'CONNECT'}
             </RetroButton>
           </div>
         </Panel>
