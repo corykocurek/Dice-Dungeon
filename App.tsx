@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, PlayerRole, HeroClass, RoomObstacle, StatType, NetworkMessage, GameAction, Room, Die } from './types';
 import { generateMap, drawCard, rollDie, getRandomLoot } from './utils/gameLogic';
@@ -6,9 +5,7 @@ import { generateStarterDice, generateStandardDie, GAME_DURATION, RESOURCE_TICK_
 import { Lobby } from './components/Lobby';
 import { DungeonMasterView } from './components/DungeonMasterView';
 import { HeroView } from './components/HeroView';
-
-// Declaration for PeerJS global
-declare const Peer: any;
+import Peer from 'peerjs';
 
 const INITIAL_STATE: GameState = {
   status: 'LOBBY',
@@ -90,7 +87,7 @@ export default function App() {
 
         broadcastState(newState);
         return newState;
-      });
+    });
     }, 1000);
 
     return () => clearInterval(interval);

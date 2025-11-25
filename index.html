@@ -4,101 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dice Dungeon</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
-    <style>
-      body {
-        font-family: 'VT323', monospace;
-        background-color: #1a1a1a;
-        color: #e2e8f0;
-      }
-      .font-retro {
-        font-family: 'Press Start 2P', cursive;
-      }
-      .scanline {
-        background: linear-gradient(
-          to bottom,
-          rgba(255,255,255,0),
-          rgba(255,255,255,0) 50%,
-          rgba(0,0,0,0.2) 50%,
-          rgba(0,0,0,0.2)
-        );
-        background-size: 100% 4px;
-        pointer-events: none;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #111; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #444; 
-        border: 2px solid #000;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #666; 
-      }
-      
-      .perspective-container {
-        perspective: 800px;
-        overflow: hidden;
-      }
-      .preserve-3d {
-        transform-style: preserve-3d;
-      }
-
-      @keyframes tumble {
-        0% { transform: rotate(0deg) scale(1); }
-        25% { transform: rotate(90deg) scale(1.1); }
-        50% { transform: rotate(180deg) scale(1); }
-        75% { transform: rotate(270deg) scale(1.1); }
-        100% { transform: rotate(360deg) scale(1); }
-      }
-      .animate-tumble {
-        animation: tumble 0.5s ease-in-out;
-      }
-
-      /* Retro Grid Travel Effect */
-      .grid-floor {
-        background-image: 
-          linear-gradient(rgba(59, 130, 246, 0.5) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(59, 130, 246, 0.5) 1px, transparent 1px);
-        background-size: 40px 40px;
-        transform-origin: 50% 100%;
-        transform: rotateX(60deg);
-        animation: scroll-grid 1s linear infinite;
-      }
-      .grid-ceiling {
-        background-image: 
-          linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px);
-        background-size: 40px 40px;
-        transform-origin: 50% 0%;
-        transform: rotateX(-60deg);
-        animation: scroll-grid 1s linear infinite;
-      }
-      @keyframes scroll-grid {
-        0% { background-position: 0 0; }
-        100% { background-position: 0 40px; }
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^3.4.0",
     "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
-    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^3.4.0"
+    "peerjs": "https://aistudiocdn.com/peerjs@^1.5.5"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
