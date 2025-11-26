@@ -23,11 +23,13 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
   const [isHost, setIsHost] = useState(false);
   const [peerId, setPeerId] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   // Network Refs
   const peerRef = useRef<any>(null);
   const connectionsRef = useRef<any[]>([]); 
   const hostConnectionRef = useRef<any>(null); 
+  const isPeerInitialized = useRef(false); // Track init state to handle StrictMode
   
   // Profile Ref
   const tempProfileRef = useRef<Partial<Player>>({});
@@ -96,7 +98,8 @@ export default function App() {
 
   // --- Networking ---
   const initPeer = () => {
-    if (peerRef.current) return;
+    if (isPeerInitialized.current) return;
+    isPeerInitialized.current = true;
     
     // Create Peer instance
     const peer = new Peer(); 
@@ -104,11 +107,19 @@ export default function App() {
     peer.on('open', (id: string) => {
       console.log('My peer ID is: ' + id);
       setPeerId(id);
+      setConnectionError(null);
     });
 
     peer.on('error', (err: any) => {
         console.error("PeerJS Error:", err);
-        // Optional: Handle specific errors like 'unavailable-id'
+        setConnectionError(`Network Error: ${err.type || 'Unknown'}`);
+    });
+
+    peer.on('disconnected', () => {
+        console.log("Peer disconnected from server. Attempting reconnect...");
+        if (peer && !peer.destroyed) {
+            peer.reconnect();
+        }
     });
 
     peer.on('connection', (conn: any) => {
@@ -133,12 +144,21 @@ export default function App() {
   };
 
   const connectToHost = (hostId: string) => {
-    if (peerRef.current) {
+    if (peerRef.current && !peerRef.current.destroyed) {
         console.log(`Connecting to host: ${hostId}...`);
         const conn = peerRef.current.connect(hostId);
         hostConnectionRef.current = conn;
 
+        // If connection doesn't open in 5s, timeout
+        const timeout = setTimeout(() => {
+            if (!conn.open) {
+                alert("Connection timed out. Host may be offline or ID is incorrect.");
+                conn.close();
+            }
+        }, 5000);
+
         conn.on('open', () => {
+             clearTimeout(timeout);
              console.log("Connected to host!");
              const tempProfile = tempProfileRef.current;
              const joinReq: Player = {
@@ -170,6 +190,7 @@ export default function App() {
         });
 
         conn.on('error', (err: any) => {
+            clearTimeout(timeout);
             console.error("Connection error:", err);
             alert(`Could not connect to host: ${err.type || 'Unknown Error'}`);
         });
@@ -186,13 +207,12 @@ export default function App() {
 
   useEffect(() => {
     initPeer();
-    // CRITICAL FIX: Properly cleanup peer reference on unmount
-    // This prevents the "stale peer" issue in React StrictMode
+    // Note: In React StrictMode, components mount/unmount twice.
+    // We purposefully DO NOT destroy the peer in the cleanup function
+    // to persist the connection across these re-renders. 
+    // PeerJS handles browser window closure cleanup automatically.
     return () => {
-      if (peerRef.current) {
-          peerRef.current.destroy();
-          peerRef.current = null;
-      }
+       // Intentionally empty to keep peer alive
     };
   }, []);
 
@@ -645,7 +665,25 @@ export default function App() {
     }
   };
 
-  if (!peerId) return <div className="text-white p-4">Initializing Network...</div>;
+  if (!peerId && !connectionError) return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-200 font-mono gap-4">
+          <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+          <div>INITIALIZING NETWORK...</div>
+      </div>
+  );
+
+  if (connectionError) return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-red-400 font-mono gap-4 p-4 text-center">
+          <div className="text-2xl">CONNECTION ERROR</div>
+          <div>{connectionError}</div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white mt-4"
+          >
+              RETRY CONNECTION
+          </button>
+      </div>
+  );
 
   return (
     <>
