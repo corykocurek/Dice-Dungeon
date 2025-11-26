@@ -15,7 +15,7 @@ interface Room3DProps {
 
 export const Room3D: React.FC<Room3DProps> = ({ obstacles, isExit, isStart, items = [], className }) => {
   return (
-    <div className={`relative w-full h-64 md:h-80 overflow-hidden bg-black perspective-container ${className}`}>
+    <div className={`relative w-full overflow-hidden bg-black perspective-container ${className || 'h-64 md:h-80'}`}>
       {/* Ceiling */}
       <div className="absolute top-0 w-full h-1/2 bg-gradient-to-b from-slate-900 to-slate-800 border-b border-slate-900/50"></div>
       {/* Floor */}

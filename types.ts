@@ -61,6 +61,11 @@ export interface Player {
   // Upgrade Logic
   upgradePoints: number;
   obstaclesDefeatedCount: number; // Every 2 grants a point
+  
+  // Drafting
+  draftStep: number;
+  draftDieOptions: Die[];
+  isReady: boolean;
 }
 
 export interface ObstacleSpecialRules {
@@ -107,11 +112,13 @@ export interface Room {
 }
 
 export interface GameState {
-  status: 'LOBBY' | 'PLAYING' | 'VICTORY_HERO' | 'VICTORY_DM';
+  status: 'LOBBY' | 'PREGAME' | 'PLAYING' | 'VICTORY_HERO' | 'VICTORY_DM';
   gameId?: string;
   timer: number; // Seconds remaining
   dmResources: number;
   dmHand: ObstacleCard[];
+  dmDeck: ObstacleCard[]; // Drafted deck
+  dmDraftOptions: ObstacleCard[]; // For pregame
   players: Player[];
   map: Record<string, Room>; // Map keyed by "x,y"
   localPlayerId: string | null;
@@ -143,4 +150,7 @@ export type GameAction =
   | { type: 'PLAYER_JOIN'; player: Player }
   | { type: 'UPDATE_PLAYER'; playerId: string; data: Partial<Player> }
   | { type: 'ESCAPE_DUNGEON'; playerId: string }
-  | { type: 'RESET_LOBBY' };
+  | { type: 'RESET_LOBBY' }
+  | { type: 'DRAFT_DIE'; playerId: string; dieIndex: number } // dieIndex refers to index in draftDieOptions
+  | { type: 'DRAFT_CARD'; cardIndex: number } // cardIndex refers to index in dmDraftOptions
+  | { type: 'PLAYER_READY'; playerId: string };

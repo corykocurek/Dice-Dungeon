@@ -1,25 +1,32 @@
 
 
-import { Room, ObstacleCard, StatType, RoomObstacle } from '../types';
+import { Room, ObstacleCard, StatType, RoomObstacle, Die } from '../types';
 import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DURATION } from '../constants';
 
 const getFilteredDeck = (gameTimer?: number): Omit<ObstacleCard, 'id'>[] => {
-    if (gameTimer === undefined) return OBSTACLE_DECK; // Fallback
+    if (gameTimer === undefined) return OBSTACLE_DECK; 
     
-    // Timer > 240 (First minute): Basic
-    // Timer > 120 (Mid game): Basic + Neutral
-    // Timer <= 120 (Late game): All
-    
-    if (gameTimer > 480) { // First 2 mins of 10 min game
+    // Fallback logic for in-game generation if needed, but DM deck is preferred in PLAYING
+    if (gameTimer > 480) { 
         return OBSTACLE_DECK.filter(c => c.tier === 'BASIC');
-    } else if (gameTimer > 240) { // Mid game
+    } else if (gameTimer > 240) { 
         return OBSTACLE_DECK.filter(c => c.tier === 'BASIC' || c.tier === 'NEUTRAL');
-    } else { // Late game
+    } else { 
         return OBSTACLE_DECK;
     }
 }
 
-export const drawCard = (gameTimer: number = 0): ObstacleCard => {
+export const drawCard = (gameTimer: number = 0, sourceDeck?: ObstacleCard[]): ObstacleCard => {
+  if (sourceDeck && sourceDeck.length > 0) {
+      // Draw from drafted deck
+      const idx = Math.floor(Math.random() * sourceDeck.length);
+      const card = sourceDeck[idx];
+      // Note: In a real TCG we remove it, but here the DM "hand" refills from the "deck" indefinitely?
+      // The prompt implies "use for the game". Let's assume the deck is a pool.
+      return { ...card, id: `card-play-${Date.now()}-${Math.random()}` };
+  }
+  
+  // Fallback if no drafted deck
   const deck = getFilteredDeck(gameTimer);
   const template = deck[Math.floor(Math.random() * deck.length)];
   return {
@@ -31,6 +38,36 @@ export const drawCard = (gameTimer: number = 0): ObstacleCard => {
 export const getRandomLoot = (): string => {
     return LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
 };
+
+// Draft Helpers
+export const generateDraftDie = (id: string, powerLevel: number): Die => {
+    const allStats = Object.values(StatType);
+    const faces: StatType[] = [];
+    const multipliers: number[] = [];
+
+    for (let i = 0; i < 6; i++) {
+        faces.push(allStats[Math.floor(Math.random() * allStats.length)]);
+        // powerLevel 0: no multipliers
+        // powerLevel 1: 10% chance of x2
+        // powerLevel 2: 30% chance of x2
+        const multChance = powerLevel === 0 ? 0 : (powerLevel === 1 ? 0.1 : 0.3);
+        multipliers.push(Math.random() < multChance ? 2 : 1);
+    }
+    
+    const currentValue = faces[0];
+    return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+};
+
+export const generateDraftCards = (tier: 'BASIC' | 'NEUTRAL' | 'ADVANCED', count: number): ObstacleCard[] => {
+    const pool = OBSTACLE_DECK.filter(c => c.tier === tier);
+    const result: ObstacleCard[] = [];
+    for(let i=0; i<count; i++) {
+        const t = pool[Math.floor(Math.random() * pool.length)];
+        result.push({ ...t, id: `draft-${Date.now()}-${Math.random()}` });
+    }
+    return result;
+};
+
 
 // BFS to find path
 const findPath = (map: Record<string, Room>, startId: string, endId: string): string[] | null => {
@@ -213,4 +250,37 @@ export const generateMap = (): Record<string, Room> => {
 
 export const rollDie = (dieFace: StatType): StatType => {
     return dieFace; 
+};
+
+export const generateStandardDie = (id: string): Die => {
+  // Randomly assign 6 faces from the pool
+  const allStats = Object.values(StatType);
+  const faces: StatType[] = [];
+  const multipliers: number[] = [];
+  
+  for (let i = 0; i < 6; i++) {
+    faces.push(allStats[Math.floor(Math.random() * allStats.length)]);
+    multipliers.push(1); // Default multiplier 1x
+  }
+  
+  const currentValue = faces[Math.floor(Math.random() * faces.length)];
+  return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+};
+
+export const generateBalancedDie = (id: string): Die => {
+  // Always has exactly one of each stat
+  const faces = Object.values(StatType);
+  const multipliers = [1, 1, 1, 1, 1, 1];
+  
+  const currentValue = faces[Math.floor(Math.random() * faces.length)];
+  return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+};
+
+export const generateStarterDice = (): Die[] => {
+  // START WITH 1 DIE (Balanced)
+  // Others Drafted
+  const suffix = Math.floor(Math.random() * 100000);
+  return [
+    generateBalancedDie(`d1-${suffix}`), 
+  ];
 };

@@ -1,0 +1,126 @@
+
+import React from 'react';
+import { GameState, Player, PlayerRole, StatType, Die, ObstacleCard } from '../types';
+import { RetroButton, Panel } from './RetroComponents';
+import { STAT_COLORS, STAT_BG_COLORS, ASSETS } from '../constants';
+import { Shield, Zap, Book, Cross, Axe, Music, Check, Star } from 'lucide-react';
+
+interface PregameProps {
+  gameState: GameState;
+  localPlayer: Player;
+  onDraftDie: (dieIndex: number) => void;
+  onDraftCard: (cardIndex: number) => void;
+  onReady: () => void;
+}
+
+export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, onDraftDie, onDraftCard, onReady }) => {
+  const isDM = localPlayer.role === PlayerRole.DM;
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 gap-6">
+      <div className="text-center animate-in fade-in zoom-in duration-500">
+         <h1 className="text-4xl text-yellow-400 font-retro mb-2">PREPARE FOR BATTLE</h1>
+         <div className="text-xl font-mono text-slate-300">
+             TIME REMAINING: {Math.floor(gameState.timer / 60)}:{(gameState.timer % 60).toString().padStart(2, '0')}
+         </div>
+      </div>
+
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          {/* Main Draft Area */}
+          <Panel title={isDM ? "Draft Your Trap Deck" : "Forge Your Dice Pool"} className="min-h-[400px] flex flex-col">
+              {localPlayer.isReady ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-4 text-green-400">
+                      <div className="w-20 h-20 border-4 border-green-500 rounded-full flex items-center justify-center animate-pulse">
+                          <Check className="w-10 h-10" />
+                      </div>
+                      <div className="font-retro text-xl">READY</div>
+                      <div className="text-sm text-slate-400">Waiting for other players...</div>
+                  </div>
+              ) : (
+                  <div className="flex-1 flex flex-col gap-4">
+                      <div className="text-center text-slate-300 mb-4">
+                          {isDM 
+                             ? `Select card ${gameState.dmDeck.length + 1}/10 for your deck.` 
+                             : `Select Die ${localPlayer.draftStep + 2}/4 for your pool.`}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {isDM ? (
+                              gameState.dmDraftOptions.map((card, idx) => (
+                                  <div key={card.id} 
+                                       onClick={() => onDraftCard(idx)}
+                                       className="bg-slate-800 border-2 border-slate-600 p-2 cursor-pointer hover:border-red-500 hover:bg-slate-700 transition-all flex flex-col gap-2 group relative">
+                                       <div className="w-full aspect-square bg-black border border-slate-700 relative">
+                                            <img src={card.imageUrl} className="w-full h-full object-contain [image-rendering:pixelated]" />
+                                            <div className="absolute top-1 right-1 text-[8px] bg-slate-700 text-white px-1 rounded">{card.tier}</div>
+                                       </div>
+                                       <div className="font-bold text-xs text-slate-200">{card.name}</div>
+                                       <div className="text-[10px] text-slate-400 leading-tight">{card.description}</div>
+                                       <div className="mt-auto flex gap-1 flex-wrap">
+                                            {(Object.entries(card.requirements) as [StatType, number][]).map(([stat, req]) => (
+                                                <div key={stat} className="text-[8px] bg-black/50 px-1 rounded text-slate-300 border border-slate-700">
+                                                    {req} {stat}
+                                                </div>
+                                            ))}
+                                       </div>
+                                  </div>
+                              ))
+                          ) : (
+                              localPlayer.draftDieOptions.map((die, idx) => (
+                                  <div key={die.id}
+                                       onClick={() => onDraftDie(idx)}
+                                       className="bg-slate-800 border-2 border-slate-600 p-4 cursor-pointer hover:border-yellow-400 hover:bg-slate-700 transition-all flex flex-col items-center gap-4 group">
+                                       
+                                       <div className={`w-16 h-16 rounded-xl border-4 flex items-center justify-center bg-slate-900 ${STAT_COLORS[die.faces[0]]}`}>
+                                            <div className={`w-8 h-8 rounded-full ${STAT_BG_COLORS[die.faces[0]]}`}></div>
+                                       </div>
+                                       
+                                       <div className="w-full grid grid-cols-3 gap-1">
+                                            {die.faces.map((f, i) => (
+                                                <div key={i} className={`h-6 rounded border flex items-center justify-center relative ${STAT_BG_COLORS[f]}`}>
+                                                    {die.multipliers[i] > 1 && (
+                                                        <Star className="w-3 h-3 text-yellow-300 fill-yellow-300 drop-shadow-md" />
+                                                    )}
+                                                </div>
+                                            ))}
+                                       </div>
+                                       <div className="text-xs text-slate-400 font-mono">
+                                           {die.multipliers.filter(m => m > 1).length > 0 ? 'Contains Multipliers!' : 'Standard Die'}
+                                       </div>
+                                  </div>
+                              ))
+                          )}
+                      </div>
+                  </div>
+              )}
+          </Panel>
+
+          {/* Status Panel */}
+          <Panel title="Squad Status" className="flex flex-col">
+              <div className="flex flex-col gap-2">
+                  {gameState.players.map(p => (
+                      <div key={p.id} className="bg-slate-800 p-3 flex items-center justify-between border border-slate-600">
+                          <div className="flex items-center gap-3">
+                              <div className={`w-3 h-3 rounded-full ${p.isReady ? 'bg-green-500' : 'bg-slate-500 animate-pulse'}`}></div>
+                              <span className={p.id === localPlayer.id ? "text-yellow-400 font-bold" : "text-slate-300"}>
+                                  {p.name} ({p.role === 'DM' ? 'DM' : p.heroClass})
+                              </span>
+                          </div>
+                          <div className="text-xs font-mono text-slate-400">
+                              {p.isReady ? 'READY' : (p.role === 'DM' ? `Drafting Deck...` : `Drafting Dice...`)}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+              
+              {localPlayer.isReady && (
+                  <div className="mt-auto pt-4 text-center text-slate-500 animate-pulse">
+                      Waiting for all players to ready up...
+                  </div>
+              )}
+          </Panel>
+      </div>
+    </div>
+  );
+};

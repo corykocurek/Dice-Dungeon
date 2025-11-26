@@ -54,9 +54,21 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   // Calculate Movement Timer
   const [moveProgress, setMoveProgress] = useState(0);
   
+  // Determine travel direction
+  const [travelDir, setTravelDir] = useState<'N' | 'S' | 'E' | 'W' | null>(null);
+
   useEffect(() => {
     let interval: any;
     if (player.isMoving) {
+      if (player.previousRoomId && player.currentRoomId) {
+          const [px, py] = player.previousRoomId.split(',').map(Number);
+          const [cx, cy] = player.currentRoomId.split(',').map(Number);
+          if (cx > px) setTravelDir('E');
+          else if (cx < px) setTravelDir('W');
+          else if (cy > py) setTravelDir('S');
+          else if (cy < py) setTravelDir('N');
+      }
+      
       interval = setInterval(() => {
         const remaining = player.moveUnlockTime - Date.now();
         const elapsed = MOVEMENT_DELAY - remaining;
@@ -65,9 +77,10 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       }, 100);
     } else {
       if (moveProgress !== 0) setMoveProgress(0);
+      setTravelDir(null);
     }
     return () => clearInterval(interval);
-  }, [player.isMoving, player.moveUnlockTime]);
+  }, [player.isMoving, player.moveUnlockTime, player.currentRoomId, player.previousRoomId]);
 
   useEffect(() => {
       const interval = setInterval(() => {
@@ -420,6 +433,14 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                     <div className="w-64 h-6 border-2 border-slate-500 p-1 bg-black">
                         <div className="h-full bg-blue-500 transition-all duration-100" style={{ width: `${moveProgress}%` }}></div>
                     </div>
+                    {travelDir && (
+                         <div className="flex items-center justify-center">
+                             {travelDir === 'N' && <ArrowUp className="w-12 h-12 text-yellow-400 animate-bounce" />}
+                             {travelDir === 'S' && <ArrowDown className="w-12 h-12 text-yellow-400 animate-bounce" />}
+                             {travelDir === 'E' && <ArrowRight className="w-12 h-12 text-yellow-400 animate-bounce" />}
+                             {travelDir === 'W' && <ArrowLeft className="w-12 h-12 text-yellow-400 animate-bounce" />}
+                         </div>
+                    )}
                 </div>
             </div>
         )}

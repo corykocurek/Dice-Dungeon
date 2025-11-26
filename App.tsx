@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, PlayerRole, HeroClass, RoomObstacle, StatType, NetworkMessage, GameAction, Room, Die } from './types';
-import { generateMap, drawCard, rollDie, getRandomLoot } from './utils/gameLogic';
-import { generateStarterDice, generateStandardDie, GAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION } from './constants';
+import { generateMap, drawCard, rollDie, getRandomLoot, generateDraftDie, generateDraftCards, generateStarterDice } from './utils/gameLogic';
+import { GAME_DURATION, PREGAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION, OBSTACLE_DECK } from './constants';
 import { Lobby } from './components/Lobby';
 import { DungeonMasterView } from './components/DungeonMasterView';
 import { HeroView } from './components/HeroView';
+import { PregameView } from './components/PregameView';
 import Peer from 'peerjs';
 
 const INITIAL_STATE: GameState = {
@@ -12,6 +14,8 @@ const INITIAL_STATE: GameState = {
   timer: GAME_DURATION,
   dmResources: 8,
   dmHand: [],
+  dmDeck: [],
+  dmDraftOptions: [],
   players: [],
   map: {},
   localPlayerId: null,
@@ -31,14 +35,15 @@ export default function App() {
   const peerRef = useRef<any>(null);
   const connectionsRef = useRef<any[]>([]); 
   const hostConnectionRef = useRef<any>(null); 
-  const isPeerInitialized = useRef(false); // Track init state to handle StrictMode
+  const isPeerInitialized = useRef(false); 
   
   // Profile Ref
   const tempProfileRef = useRef<Partial<Player>>({});
 
   // --- Game Loop (Host Only) ---
   useEffect(() => {
-    if (!isHost || gameState.status !== 'PLAYING') return;
+    if (!isHost) return;
+    if (gameState.status !== 'PLAYING' && gameState.status !== 'PREGAME') return;
 
     const interval = setInterval(() => {
       setGameState(prev => {
@@ -46,6 +51,35 @@ export default function App() {
         const newState: GameState = JSON.parse(JSON.stringify(prev));
 
         newState.timer = prev.timer - 1;
+
+        if (newState.status === 'PREGAME') {
+            if (newState.timer <= 0) {
+                // Force Start
+                 newState.status = 'PLAYING';
+                 newState.timer = GAME_DURATION;
+                 newState.lastResourceTick = now;
+                 newState.lastCardDrawTick = now;
+                 // Fill DM hand if empty from deck or random
+                 while(newState.dmHand.length < 3) {
+                     newState.dmHand.push(drawCard(GAME_DURATION, newState.dmDeck));
+                 }
+            } else {
+                // Check readiness
+                if (newState.players.every(p => p.isReady)) {
+                    newState.status = 'PLAYING';
+                    newState.timer = GAME_DURATION;
+                    newState.lastResourceTick = now;
+                    newState.lastCardDrawTick = now;
+                    while(newState.dmHand.length < 3) {
+                         newState.dmHand.push(drawCard(GAME_DURATION, newState.dmDeck));
+                     }
+                }
+            }
+            broadcastState(newState);
+            return newState;
+        }
+
+        // PLAYING LOOP
         if (newState.timer <= 0) {
             newState.status = 'VICTORY_DM';
             newState.timer = 0;
@@ -59,7 +93,8 @@ export default function App() {
         }
 
         if (now - prev.lastCardDrawTick > CARD_DRAW_INTERVAL) {
-            newState.dmHand.push(drawCard(newState.timer));
+            // Draw from DM Deck if possible
+            newState.dmHand.push(drawCard(newState.timer, newState.dmDeck));
             newState.lastCardDrawTick = now;
         }
         
@@ -98,7 +133,6 @@ export default function App() {
     
     setPeerStatus('INITIALIZING');
     const peer = new Peer(undefined, {
-      // Send a heartbeat every 5 seconds to keep the connection alive
       pingInterval: 5000 
     }); 
     peerRef.current = peer;
@@ -172,7 +206,10 @@ export default function App() {
                  moveUnlockTime: 0,
                  lastRerollTime: 0,
                  upgradePoints: 0,
-                 obstaclesDefeatedCount: 0
+                 obstaclesDefeatedCount: 0,
+                 draftStep: 0,
+                 draftDieOptions: [],
+                 isReady: false
              };
              conn.send({ type: 'JOIN_REQUEST', payload: joinReq });
         });
@@ -217,12 +254,17 @@ export default function App() {
   const handlePlayerJoin = (newPlayer: Player) => {
     setGameState(prev => {
         let playerToAdd = { ...newPlayer };
+        // Late join logic
         if (prev.status !== 'LOBBY') {
             const startRoom = Object.values(prev.map as Record<string, Room>).find(r => r.isStart);
             playerToAdd.currentRoomId = startRoom?.id || '0,0';
             playerToAdd.visitedRooms = [playerToAdd.currentRoomId];
             if (playerToAdd.role === PlayerRole.HERO) {
+                // If joining late, give standard dice instead of drafting
                 playerToAdd.dicePool = generateStarterDice();
+                playerToAdd.dicePool.push(generateDraftDie(`d2-late`, 0));
+                playerToAdd.dicePool.push(generateDraftDie(`d3-late`, 0));
+                playerToAdd.dicePool.push(generateDraftDie(`d4-late`, 0));
                 playerToAdd.inventory = ['ITEM_SCROLL']; 
             }
         }
@@ -313,27 +355,92 @@ export default function App() {
       const getRoom = (id: string) => draft.map[id];
 
       if (action.type === 'START_GAME') {
-          draft.status = 'PLAYING';
-          draft.timer = GAME_DURATION;
+          draft.status = 'PREGAME';
+          draft.timer = PREGAME_DURATION;
           draft.map = generateMap();
           
-          for(let i=0; i<3; i++) draft.dmHand.push(drawCard(GAME_DURATION));
+          // Setup DM Draft Options (Start with Basic)
+          draft.dmDraftOptions = generateDraftCards('BASIC', 3);
+          draft.dmDeck = [];
 
-          const startRoom = Object.values(draft.map).find(r => r.isStart);
+          const startRoom = Object.values(draft.map as Record<string, Room>).find(r => r.isStart);
           draft.players.forEach(p => {
               p.currentRoomId = startRoom?.id || '0,0';
               p.visitedRooms = [p.currentRoomId];
+              p.isReady = false;
+              
               if (p.role === PlayerRole.HERO) {
-                  p.dicePool = generateStarterDice();
+                  p.dicePool = generateStarterDice(); // 1 balanced die
                   p.inventory = ['ITEM_SCROLL']; 
+                  p.draftStep = 0;
+                  // First draft options (Power 0)
+                  p.draftDieOptions = [
+                      generateDraftDie('draft-1', 0),
+                      generateDraftDie('draft-2', 0),
+                      generateDraftDie('draft-3', 0)
+                  ];
               }
           });
+      }
+      else if (action.type === 'DRAFT_DIE') {
+          const player = draft.players.find(p => p.id === action.playerId);
+          if (player && player.role === PlayerRole.HERO && !player.isReady) {
+               const selectedDie = player.draftDieOptions[action.dieIndex];
+               if (selectedDie) {
+                   const newDie = { ...selectedDie, id: `die-${player.id}-${player.draftStep}-${now}` };
+                   player.dicePool.push(newDie);
+                   player.draftStep++;
+                   
+                   // Prepare next step
+                   if (player.draftStep < 3) {
+                       const powerLevel = player.draftStep; // 0, 1, 2 increasing power
+                       player.draftDieOptions = [
+                          generateDraftDie('draft-1', powerLevel),
+                          generateDraftDie('draft-2', powerLevel),
+                          generateDraftDie('draft-3', powerLevel)
+                       ];
+                   } else {
+                       player.draftDieOptions = [];
+                       player.isReady = true; // Auto ready after 3 drafts (total 4 dice)
+                   }
+               }
+          }
+      }
+      else if (action.type === 'DRAFT_CARD') {
+          if (!isHost) return draft; // Only host/DM drives global state for cards logic usually, but here DM might not be host. 
+          // Actually, if DM is not host, they send action to Host.
+          // Host executes this logic.
+          
+          if (draft.dmDeck.length < 10) {
+              const selectedCard = draft.dmDraftOptions[action.cardIndex];
+              if (selectedCard) {
+                  draft.dmDeck.push(selectedCard);
+                  const count = draft.dmDeck.length;
+                  
+                  if (count < 10) {
+                      let tier: 'BASIC' | 'NEUTRAL' | 'ADVANCED' = 'BASIC';
+                      if (count >= 4) tier = 'NEUTRAL';
+                      if (count >= 7) tier = 'ADVANCED';
+                      draft.dmDraftOptions = generateDraftCards(tier, 3);
+                  } else {
+                      draft.dmDraftOptions = [];
+                      // Mark DM as ready
+                      const dm = draft.players.find(p => p.role === PlayerRole.DM);
+                      if (dm) dm.isReady = true;
+                  }
+              }
+          }
+      }
+      else if (action.type === 'PLAYER_READY') {
+          const player = draft.players.find(p => p.id === action.playerId);
+          if (player) player.isReady = true;
       }
       else if (action.type === 'RESET_LOBBY') {
           draft.status = 'LOBBY';
           draft.timer = GAME_DURATION;
           draft.dmResources = 8;
           draft.dmHand = [];
+          draft.dmDeck = [];
           draft.map = {};
           draft.lastSuperChargeTime = 0;
           draft.players.forEach(p => {
@@ -347,8 +454,12 @@ export default function App() {
               p.lastRerollTime = 0;
               p.upgradePoints = 0;
               p.obstaclesDefeatedCount = 0;
+              p.draftStep = 0;
+              p.draftDieOptions = [];
+              p.isReady = false;
           });
       }
+      // ... (Existing playing logic) ...
       else if (action.type === 'SUPER_CHARGE_ROOM') {
           const room = getRoom(action.roomId);
           if (room && now - draft.lastSuperChargeTime > SUPERCHARGE_COOLDOWN) {
@@ -464,7 +575,9 @@ export default function App() {
                   player.inventory.push(itemId);
                   const def = ITEM_REGISTRY[itemId];
                   if (def?.grantsExtraDie) {
-                      player.dicePool.push(generateStandardDie(`die-${player.id}-${now}`));
+                      // Note: In new draft system, extra die needs logic? 
+                      // Standard generic die for tool
+                      player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0));
                   }
               }
           }
@@ -478,7 +591,7 @@ export default function App() {
                    player.inventory.splice(idx, 1);
                    room.items.push(action.itemId);
                    const def = ITEM_REGISTRY[action.itemId];
-                   if (def?.grantsExtraDie && player.dicePool.length > 4) { // Only remove if > starter
+                   if (def?.grantsExtraDie && player.dicePool.length > 4) { 
                        player.dicePool.pop(); 
                    }
                }
@@ -552,7 +665,7 @@ export default function App() {
               };
               room.activeObstacles.push(newObstacle);
               while(draft.dmHand.length < 3) {
-                  draft.dmHand.push(drawCard(draft.timer));
+                  draft.dmHand.push(drawCard(draft.timer, draft.dmDeck));
               }
           }
       }
@@ -575,7 +688,8 @@ export default function App() {
     const hostPlayer: Player = {
         id: peerId!, name, role: PlayerRole.HERO, heroClass: HeroClass.FIGHTER, currentRoomId: '0,0',
         previousRoomId: null, visitedRooms: ['0,0'], dicePool: [], inventory: [], isMoving: false,
-        moveUnlockTime: 0, lastRerollTime: 0, upgradePoints: 0, obstaclesDefeatedCount: 0
+        moveUnlockTime: 0, lastRerollTime: 0, upgradePoints: 0, obstaclesDefeatedCount: 0,
+        draftStep: 0, draftDieOptions: [], isReady: false
     };
     setGameState(prev => ({
         ...prev, players: [hostPlayer], localPlayerId: peerId!
@@ -648,6 +762,16 @@ export default function App() {
           }}
           onStartGame={() => dispatchAction({ type: 'START_GAME' })}
         />
+      )}
+
+      {gameState.status === 'PREGAME' && gameState.localPlayerId && (
+          <PregameView 
+             gameState={gameState}
+             localPlayer={gameState.players.find(p => p.id === gameState.localPlayerId)!}
+             onDraftDie={(idx) => dispatchAction({ type: 'DRAFT_DIE', playerId: gameState.localPlayerId!, dieIndex: idx })}
+             onDraftCard={(idx) => dispatchAction({ type: 'DRAFT_CARD', cardIndex: idx })}
+             onReady={() => dispatchAction({ type: 'PLAYER_READY', playerId: gameState.localPlayerId! })}
+          />
       )}
 
       {(gameState.status === 'PLAYING' || gameState.status.includes('VICTORY')) && (
