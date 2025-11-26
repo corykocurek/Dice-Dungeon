@@ -2,12 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { GameState, Room, ObstacleCard, Player, StatType, HeroClass, PlayerRole } from '../types';
 import { Panel, RetroButton, ProgressBar } from './RetroComponents';
-import { MAP_SIZE, OBSTACLE_DECK, STAT_COLORS, RED_KEY_ID, RED_DOOR_CARD, RESOURCE_TICK_INTERVAL } from '../constants';
-import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music } from 'lucide-react';
+import { MAP_SIZE, OBSTACLE_DECK, STAT_COLORS, RED_KEY_ID, RED_DOOR_CARD, RESOURCE_TICK_INTERVAL, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION } from '../constants';
+import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music, Brain, Flame } from 'lucide-react';
 
 interface DMProps {
   gameState: GameState;
   onPlaceCard: (card: ObstacleCard, roomId: string) => void;
+  onSupercharge: (roomId: string) => void;
 }
 
 const CLASS_ICONS: Record<HeroClass, React.ElementType> = {
@@ -19,9 +20,10 @@ const CLASS_ICONS: Record<HeroClass, React.ElementType> = {
     [HeroClass.BARD]: Music,
 };
 
-export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard }) => {
+export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, onSupercharge }) => {
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
   const [inspectRoomId, setInspectRoomId] = React.useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   
   // Use a Ref to hold the latest game state for the animation loop
   const gameStateRef = React.useRef(gameState);
@@ -36,10 +38,9 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
       let frameId: number;
       
       const animate = () => {
-          // Use the ref to get the absolute latest state logic
           const currentState = gameStateRef.current;
-          
           const now = Date.now();
+          setCurrentTime(now);
           const elapsed = now - currentState.lastResourceTick;
           const fraction = Math.min(1, Math.max(0, elapsed / RESOURCE_TICK_INTERVAL));
           
@@ -61,7 +62,6 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
 
   const handleRoomClick = (roomId: string) => {
     if (selectedCardId) {
-        // If a card is selected, try to place it
         const card = gameState.dmHand.find(c => c.id === selectedCardId);
         if (card) {
             onPlaceCard(card, roomId);
@@ -69,7 +69,6 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
             setInspectRoomId(null); 
         }
     } else {
-        // Otherwise, inspect the room
         setInspectRoomId(prev => prev === roomId ? null : roomId);
     }
   };
@@ -81,6 +80,10 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
       if (a.y !== b.y) return a.y - b.y;
       return a.x - b.x;
   });
+
+  // Supercharge Cooldown
+  const superchargeCooldownRemaining = Math.max(0, SUPERCHARGE_COOLDOWN - (currentTime - gameState.lastSuperChargeTime));
+  const canSupercharge = superchargeCooldownRemaining <= 0;
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
@@ -106,13 +109,12 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
             <div className="flex-1 bg-black p-4 flex items-center justify-center relative overflow-auto shadow-inner">
                  <div className="grid gap-0 border border-slate-900" style={{ gridTemplateColumns: `repeat(${MAP_SIZE}, minmax(0, 1fr))` }}>
                     {sortedRooms.map((room: Room) => {
-                        // Filter OUT the DM from the players visible on the map
                         const playersInRoom = gameState.players.filter(p => p.currentRoomId === room.id && p.role !== PlayerRole.DM);
                         const hasTraps = room.activeObstacles.length > 0;
                         const hasKey = room.items.includes(RED_KEY_ID);
                         const hasRedDoor = room.activeObstacles.some(o => o.card.keyRequirement === RED_KEY_ID);
+                        const isSupercharged = room.superChargeUnlockTime > currentTime;
                         
-                        // Connections
                         const x = room.x;
                         const y = room.y;
                         const hasNorth = room.connections.includes(`${x},${y-1}`);
@@ -122,17 +124,12 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
 
                         const isSelected = inspectRoomId === room.id;
                         
-                        // Interaction Logic
                         const isBlocked = playersInRoom.length > 0 || hasTraps;
-                        const canInteract = selectedCardId ? !isBlocked : true;
 
-                        // Base Room Colors
                         let roomBg = "bg-slate-800";
                         if (room.isStart) roomBg = "bg-green-900";
                         if (room.isExit) roomBg = "bg-yellow-900";
-                        if (isSelected) roomBg = "bg-slate-600 ring-2 ring-yellow-400";
                         
-                        // Corridor Color (matches room unless special)
                         const corridorColor = "bg-slate-800";
 
                         return (
@@ -147,50 +144,30 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                     ${selectedCardId && isBlocked ? 'cursor-not-allowed opacity-50' : ''}
                                 `}
                             >
-                                {/* Grid Lines (Faint) - Z-0 (Bottom) */}
                                 <div className="absolute inset-0 border border-slate-900/50 pointer-events-none z-0"></div>
-
-                                {/* --- LAYER 1: CORRIDORS (Z-10) --- */}
-                                {/* These extend from the center to the edge. If neighbors match, they form a solid line. */}
                                 
-                                {hasNorth && (
-                                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>
-                                )}
-                                {hasSouth && (
-                                    <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>
-                                )}
-                                {hasWest && (
-                                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>
-                                )}
-                                {hasEast && (
-                                    <div className={`absolute right-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>
-                                )}
+                                {hasNorth && <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>}
+                                {hasSouth && <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[30%] h-[60%] ${corridorColor} z-10`}></div>}
+                                {hasWest && <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>}
+                                {hasEast && <div className={`absolute right-0 top-1/2 -translate-y-1/2 h-[30%] w-[60%] ${corridorColor} z-10`}></div>}
 
-                                {/* --- LAYER 2: ROOM NODE (Z-20) --- */}
-                                {/* Sits on top of the corridors to cover the intersection */}
                                 <div className={`
                                     absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
                                     w-[70%] h-[70%] z-20 rounded-sm transition-colors flex items-center justify-center
                                     ${roomBg}
                                     ${hasTraps && !isBlocked ? 'border border-red-500' : ''}
+                                    ${isSelected ? 'ring-2 ring-yellow-400' : ''}
+                                    ${isSupercharged ? 'ring-2 ring-purple-500 animate-pulse' : ''}
                                 `}>
-                                    {/* Start/Exit Label */}
                                     {room.isStart && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-green-300">START</span>}
                                     {room.isExit && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-yellow-300">EXIT</span>}
                                 </div>
 
-                                {/* --- LAYER 3: CONTENT & ICONS (Z-30) --- */}
                                 <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-                                     {/* Coordinates */}
                                      <div className="absolute top-0.5 left-0.5 text-[6px] text-slate-500 font-mono leading-none opacity-50">{x},{y}</div>
-                                    
-                                     {/* Key Indicator */}
                                      {hasKey && <Key className="absolute top-0.5 right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 text-yellow-400 fill-yellow-400 animate-pulse" />}
-                                     
-                                     {/* Red Door Indicator */}
                                      {hasRedDoor && !hasKey && <DoorOpen className="absolute top-0.5 right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 text-red-500 fill-red-900" />}
 
-                                     {/* Center Content: Players */}
                                      {playersInRoom.length > 0 && (
                                          <div className="flex gap-0.5 flex-wrap justify-center items-center max-w-[80%] bg-black/40 rounded p-0.5 backdrop-blur-sm border border-white/20">
                                              {playersInRoom.map(p => {
@@ -204,7 +181,6 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                          </div>
                                      )}
 
-                                     {/* Traps (Bottom Right) */}
                                      {hasTraps && playersInRoom.length === 0 && (
                                          <div className="absolute bottom-1 right-1 flex gap-0.5">
                                              {room.activeObstacles.map(obs => (
@@ -214,7 +190,6 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                      )}
                                 </div>
                                 
-                                {/* Hover Effect for Invalid Placement */}
                                 {selectedCardId && isBlocked && (
                                     <div className="absolute inset-0 bg-red-900/30 z-40 flex items-center justify-center">
                                         <Ban className="text-red-500 w-4 h-4" />
@@ -238,6 +213,19 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                             <button onClick={() => setInspectRoomId(null)}><X className="w-4 h-4 text-slate-400 hover:text-white"/></button>
                         </div>
                         
+                        {/* Supercharge Button */}
+                        <RetroButton 
+                            variant="danger" 
+                            className="w-full text-xs py-1"
+                            disabled={!canSupercharge}
+                            onClick={() => onSupercharge(inspectedRoom.id)}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <Flame className="w-4 h-4" />
+                                {canSupercharge ? 'SUPERCHARGE' : `RECHARGING (${Math.ceil(superchargeCooldownRemaining / 1000)}s)`}
+                            </div>
+                        </RetroButton>
+
                         {/* Players Here */}
                         {gameState.players.filter(p => p.currentRoomId === inspectedRoom.id && p.role !== PlayerRole.DM).length > 0 && (
                             <div className="space-y-1">
@@ -268,7 +256,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                              {(Object.entries(obs.card.requirements) as [StatType, number][]).map(([stat, req]) => (
                                                   <div key={stat} className="flex gap-1 items-center bg-black/40 px-1 rounded">
                                                       <span className={`${STAT_COLORS[stat]}`}>{stat}:</span>
-                                                      <span>{obs.currentSuccesses[stat] || 0}/{req}</span>
+                                                      <span>{obs.currentSuccesses[stat] || 0}/{inspectedRoom.superChargeUnlockTime > currentTime ? req*2 : req}</span>
                                                   </div>
                                              ))}
                                          </div>
@@ -277,29 +265,12 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                         <div className="mt-1 text-[10px] text-yellow-500">Requires: {obs.card.keyRequirement}</div>
                                     )}
 
-                                    {/* Special Rules Badges */}
                                     {(obs.card.specialRules && Object.keys(obs.card.specialRules).length > 0) && (
                                         <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-700/30">
-                                            {obs.card.specialRules.accumulatesDamage && (
-                                                <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1.5 py-0.5 rounded border border-yellow-700 text-[9px] text-yellow-200 font-bold">
-                                                    <Sword className="w-3 h-3" /> HP
-                                                </div>
-                                            )}
-                                            {obs.card.specialRules.preventsRetreat && (
-                                                <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold">
-                                                    <Ban className="w-3 h-3" /> NO ESCAPE
-                                                </div>
-                                            )}
-                                            {obs.card.specialRules.resetsOnLeave && (
-                                                <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold">
-                                                    <RefreshCw className="w-3 h-3" /> REGEN
-                                                </div>
-                                            )}
-                                            {obs.card.specialRules.reward && (
-                                                <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold">
-                                                    <Gift className="w-3 h-3" /> LOOT
-                                                </div>
-                                            )}
+                                            {obs.card.specialRules.accumulatesDamage && <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1.5 py-0.5 rounded border border-yellow-700 text-[9px] text-yellow-200 font-bold"><Sword className="w-3 h-3" /> HP</div>}
+                                            {obs.card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold"><Ban className="w-3 h-3" /> NO ESCAPE</div>}
+                                            {obs.card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold"><RefreshCw className="w-3 h-3" /> REGEN</div>}
+                                            {obs.card.specialRules.reward && <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold"><Gift className="w-3 h-3" /> LOOT</div>}
                                         </div>
                                     )}
                                 </div>
@@ -366,29 +337,12 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard })
                                         ))}
                                     </div>
 
-                                    {/* Special Rules Badges */}
                                     {(card.specialRules && Object.keys(card.specialRules).length > 0) && (
                                         <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-700/50">
-                                            {card.specialRules.accumulatesDamage && (
-                                                <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1.5 py-0.5 rounded border border-yellow-700 text-[9px] text-yellow-200 font-bold">
-                                                    <Sword className="w-3 h-3" /> HP
-                                                </div>
-                                            )}
-                                            {card.specialRules.preventsRetreat && (
-                                                <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold">
-                                                    <Ban className="w-3 h-3" /> NO ESCAPE
-                                                </div>
-                                            )}
-                                            {card.specialRules.resetsOnLeave && (
-                                                <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold">
-                                                    <RefreshCw className="w-3 h-3" /> REGEN
-                                                </div>
-                                            )}
-                                            {card.specialRules.reward && (
-                                                <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold">
-                                                    <Gift className="w-3 h-3" /> LOOT
-                                                </div>
-                                            )}
+                                            {card.specialRules.accumulatesDamage && <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1.5 py-0.5 rounded border border-yellow-700 text-[9px] text-yellow-200 font-bold"><Sword className="w-3 h-3" /> HP</div>}
+                                            {card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold"><Ban className="w-3 h-3" /> NO ESCAPE</div>}
+                                            {card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold"><RefreshCw className="w-3 h-3" /> REGEN</div>}
+                                            {card.specialRules.reward && <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold"><Gift className="w-3 h-3" /> LOOT</div>}
                                         </div>
                                     )}
                                 </div>

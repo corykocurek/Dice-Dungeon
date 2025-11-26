@@ -6,23 +6,15 @@ import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DU
 const getFilteredDeck = (gameTimer?: number): Omit<ObstacleCard, 'id'>[] => {
     if (gameTimer === undefined) return OBSTACLE_DECK; // Fallback
     
-    // Timer counts DOWN from GAME_DURATION (300) to 0
-    const timeElapsed = GAME_DURATION - gameTimer;
-    
-    // First 2 minutes (0-120s elapsed): Basic Only
-    // Next 2 minutes (120-240s elapsed): Basic + Neutral
-    // Last minute (240s+ elapsed): All (Advanced unlocked)
-    
-    // Actually, let's make it looser:
     // Timer > 240 (First minute): Basic
     // Timer > 120 (Mid game): Basic + Neutral
     // Timer <= 120 (Late game): All
     
-    if (gameTimer > 240) {
+    if (gameTimer > 480) { // First 2 mins of 10 min game
         return OBSTACLE_DECK.filter(c => c.tier === 'BASIC');
-    } else if (gameTimer > 120) {
+    } else if (gameTimer > 240) { // Mid game
         return OBSTACLE_DECK.filter(c => c.tier === 'BASIC' || c.tier === 'NEUTRAL');
-    } else {
+    } else { // Late game
         return OBSTACLE_DECK;
     }
 }
@@ -76,7 +68,8 @@ export const generateMap = (): Record<string, Room> => {
         isExit: false,
         connections: [],
         activeObstacles: [],
-        items: []
+        items: [],
+        superChargeUnlockTime: 0,
       };
     }
   }

@@ -12,7 +12,7 @@ interface LobbyProps {
   isHost: boolean;
   onHostGame: (name: string) => void;
   onJoinGame: (hostId: string) => void;
-  onUpdatePlayer: (role: PlayerRole, heroClass?: HeroClass, name?: string) => void;
+  onUpdatePlayer: (data: Partial<Player>) => void;
   onStartGame: () => void;
 }
 
@@ -34,8 +34,9 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [archiveTab, setArchiveTab] = useState<'ITEMS' | 'OBSTACLES'>('ITEMS');
   
   // Local selection state for when in the room
-  const [selectedRole, setSelectedRole] = useState<PlayerRole>(PlayerRole.HERO);
-  const [selectedClass, setSelectedClass] = useState<HeroClass>(HeroClass.FIGHTER);
+  const localPlayer = players.find(p => p.id === localPlayerId);
+  const [selectedRole, setSelectedRole] = useState<PlayerRole>(localPlayer?.role || PlayerRole.HERO);
+  const [selectedClass, setSelectedClass] = useState<HeroClass>(localPlayer?.heroClass || HeroClass.FIGHTER);
   const [isConnecting, setIsConnecting] = useState(false);
 
   // If we have a local player ID and players list is populated, we are in the room
@@ -43,6 +44,13 @@ export const Lobby: React.FC<LobbyProps> = ({
     if (localPlayerId && players.length > 0) {
       setView('ROOM');
       setIsConnecting(false);
+      // Sync local state with remote state when it arrives
+      const me = players.find(p => p.id === localPlayerId);
+      if (me) {
+        setName(me.name);
+        setSelectedRole(me.role);
+        if (me.heroClass) setSelectedClass(me.heroClass);
+      }
     }
   }, [localPlayerId, players]);
 
@@ -55,8 +63,18 @@ export const Lobby: React.FC<LobbyProps> = ({
     { type: HeroClass.BARD, icon: Music, bonus: "x2 Looks" },
   ];
 
-  const handleUpdate = () => {
-    onUpdatePlayer(selectedRole, selectedClass, name || `Player ${Math.floor(Math.random()*1000)}`);
+  const handleClassUpdate = (heroClass: HeroClass) => {
+    setSelectedClass(heroClass);
+    onUpdatePlayer({ heroClass });
+  };
+  
+  const handleRoleUpdate = (role: PlayerRole) => {
+    setSelectedRole(role);
+    onUpdatePlayer({ role });
+  };
+  
+  const handleNameUpdate = () => {
+    onUpdatePlayer({ name });
   };
 
   const copyToClipboard = () => {
@@ -283,7 +301,8 @@ export const Lobby: React.FC<LobbyProps> = ({
               disabled={!joinCode || !name || isConnecting}
               onClick={() => {
                 setIsConnecting(true);
-                onUpdatePlayer(PlayerRole.HERO, HeroClass.FIGHTER, name);
+                // Pre-set profile data before joining
+                onUpdatePlayer({ name, role: PlayerRole.HERO, heroClass: HeroClass.FIGHTER });
                 onJoinGame(joinCode);
                 // Timeout to reset connecting state if it fails silently
                 setTimeout(() => setIsConnecting(false), 15000);
@@ -318,25 +337,37 @@ export const Lobby: React.FC<LobbyProps> = ({
         
         {/* Configuration Panel */}
         <Panel title="Character Setup" className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase text-slate-400">Role</label>
-            <div className="flex gap-2">
-              <RetroButton 
-                variant={selectedRole === PlayerRole.HERO ? 'success' : 'outline'}
-                onClick={() => setSelectedRole(PlayerRole.HERO)}
-                className="flex-1"
-              >
-                HERO
-              </RetroButton>
-              <RetroButton 
-                variant={selectedRole === PlayerRole.DM ? 'danger' : 'outline'}
-                onClick={() => setSelectedRole(PlayerRole.DM)}
-                className="flex-1"
-              >
-                DM
-              </RetroButton>
+            <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase text-slate-400">Your Name</label>
+                <div className="flex gap-2">
+                    <input 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="flex-1 w-full bg-slate-800 border-2 border-slate-600 p-2 text-slate-200 font-mono focus:border-yellow-400 outline-none"
+                    />
+                    <RetroButton onClick={handleNameUpdate}>Set</RetroButton>
+                </div>
             </div>
-          </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs uppercase text-slate-400">Role</label>
+              <div className="flex gap-2">
+                <RetroButton 
+                  variant={selectedRole === PlayerRole.HERO ? 'success' : 'outline'}
+                  onClick={() => handleRoleUpdate(PlayerRole.HERO)}
+                  className="flex-1"
+                >
+                  HERO
+                </RetroButton>
+                <RetroButton 
+                  variant={selectedRole === PlayerRole.DM ? 'danger' : 'outline'}
+                  onClick={() => handleRoleUpdate(PlayerRole.DM)}
+                  className="flex-1"
+                >
+                  DM
+                </RetroButton>
+              </div>
+            </div>
 
           {selectedRole === PlayerRole.HERO && (
             <div className="flex flex-col gap-2">
@@ -345,7 +376,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 {heroClasses.map((c) => (
                   <button
                     key={c.type}
-                    onClick={() => setSelectedClass(c.type)}
+                    onClick={() => handleClassUpdate(c.type)}
                     className={`p-3 border-2 transition-all flex flex-col items-center gap-2 ${
                       selectedClass === c.type 
                         ? 'bg-slate-700 border-yellow-400 text-yellow-100' 
@@ -361,9 +392,6 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
           )}
 
-          <RetroButton onClick={handleUpdate} className="mt-auto">
-            UPDATE CHARACTER
-          </RetroButton>
         </Panel>
 
         {/* Players List */}
@@ -371,9 +399,9 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="flex-1 flex flex-col gap-2 overflow-y-auto">
             {players.length === 0 && <div className="text-slate-500 italic text-center p-4">Waiting for players...</div>}
             {players.map(p => (
-              <div key={p.id} className="bg-slate-900 border border-slate-700 p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-full absolute left-0 top-0 bottom-0 ${p.role === PlayerRole.DM ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+              <div key={p.id} className="bg-slate-900 border border-slate-700 p-3 flex items-center justify-between relative">
+                <div className={`w-1 h-full absolute left-0 top-0 bottom-0 ${p.role === PlayerRole.DM ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                <div className="flex items-center gap-3 pl-2">
                   <div className="flex flex-col">
                     <span className="font-bold text-slate-200">
                       {p.name} {p.id === localPlayerId ? '(You)' : ''}
@@ -383,7 +411,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                     </span>
                   </div>
                 </div>
-                {p.role === PlayerRole.DM ? <Users className="text-red-500 w-4 h-4" /> : <Users className="text-blue-500 w-4 h-4" />}
+                {p.role === PlayerRole.DM ? <Brain className="text-red-500 w-4 h-4" /> : p.heroClass ? React.createElement(heroClasses.find(h=>h.type === p.heroClass)?.icon || Users, { className: "w-4 h-4 text-blue-300" }) : null}
               </div>
             ))}
           </div>

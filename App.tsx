@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, PlayerRole, HeroClass, RoomObstacle, StatType, NetworkMessage, GameAction, Room, Die } from './types';
 import { generateMap, drawCard, rollDie, getRandomLoot } from './utils/gameLogic';
-import { generateStarterDice, generateStandardDie, GAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY } from './constants';
+import { generateStarterDice, generateStandardDie, GAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION } from './constants';
 import { Lobby } from './components/Lobby';
 import { DungeonMasterView } from './components/DungeonMasterView';
 import { HeroView } from './components/HeroView';
@@ -17,6 +17,7 @@ const INITIAL_STATE: GameState = {
   localPlayerId: null,
   lastResourceTick: Date.now(),
   lastCardDrawTick: Date.now(),
+  lastSuperChargeTime: 0,
 };
 
 export default function App() {
@@ -41,10 +42,8 @@ export default function App() {
     const interval = setInterval(() => {
       setGameState(prev => {
         const now = Date.now();
-        // Deep clone to safely mutate in loop logic
         const newState: GameState = JSON.parse(JSON.stringify(prev));
 
-        // 1. Timer
         newState.timer = prev.timer - 1;
         if (newState.timer <= 0) {
             newState.status = 'VICTORY_DM';
@@ -53,19 +52,16 @@ export default function App() {
             return newState;
         }
 
-        // 2. Resource Tick
         if (now - prev.lastResourceTick > RESOURCE_TICK_INTERVAL) {
             newState.dmResources = Math.min(10, newState.dmResources + 1);
             newState.lastResourceTick = now;
         }
 
-        // 3. Card Draw Tick
         if (now - prev.lastCardDrawTick > CARD_DRAW_INTERVAL) {
             newState.dmHand.push(drawCard(newState.timer));
             newState.lastCardDrawTick = now;
         }
         
-        // 4. Reset "Resets on Leave" Obstacles
         Object.values(newState.map).forEach((room: any) => {
             const playersInRoom = newState.players.some((p: Player) => p.currentRoomId === room.id);
             if (!playersInRoom) {
@@ -79,7 +75,6 @@ export default function App() {
             }
         });
 
-        // 5. Movement Resolution
         newState.players = newState.players.map((p: Player) => {
             if (p.isMoving && p.moveUnlockTime <= now) {
                 return { ...p, isMoving: false };
@@ -98,11 +93,11 @@ export default function App() {
 
   // --- Networking ---
   const initPeer = () => {
-    if (isPeerInitialized.current) return;
-    isPeerInitialized.current = true;
+    if (peerRef.current) return;
     
-    // Create Peer instance
+    setConnectionError(null);
     const peer = new Peer(); 
+    peerRef.current = peer;
     
     peer.on('open', (id: string) => {
       console.log('My peer ID is: ' + id);
@@ -134,22 +129,18 @@ export default function App() {
       });
       
       conn.on('open', () => {
+        connectionsRef.current = connectionsRef.current.filter(c => c.peer !== conn.peer);
         connectionsRef.current.push(conn);
-        // Send initial state immediately upon connection
         conn.send({ type: 'SYNC_STATE', payload: gameState });
       });
     });
-
-    peerRef.current = peer;
   };
 
   const connectToHost = (hostId: string) => {
     if (peerRef.current && !peerRef.current.destroyed) {
-        console.log(`Connecting to host: ${hostId}...`);
         const conn = peerRef.current.connect(hostId);
         hostConnectionRef.current = conn;
 
-        // If connection doesn't open in 5s, timeout
         const timeout = setTimeout(() => {
             if (!conn.open) {
                 alert("Connection timed out. Host may be offline or ID is incorrect.");
@@ -159,7 +150,6 @@ export default function App() {
 
         conn.on('open', () => {
              clearTimeout(timeout);
-             console.log("Connected to host!");
              const tempProfile = tempProfileRef.current;
              const joinReq: Player = {
                  id: peerRef.current.id,
@@ -200,20 +190,15 @@ export default function App() {
             window.location.reload();
         });
     } else {
-        console.error("Peer not initialized");
         alert("Network not ready. Please wait.");
     }
   };
 
   useEffect(() => {
-    initPeer();
-    // Note: In React StrictMode, components mount/unmount twice.
-    // We purposefully DO NOT destroy the peer in the cleanup function
-    // to persist the connection across these re-renders. 
-    // PeerJS handles browser window closure cleanup automatically.
-    return () => {
-       // Intentionally empty to keep peer alive
-    };
+    if (!isPeerInitialized.current) {
+        initPeer();
+        isPeerInitialized.current = true;
+    }
   }, []);
 
   const broadcastState = (state: GameState) => {
@@ -235,14 +220,12 @@ export default function App() {
             }
         }
 
-        // Avoid duplicates
         const filteredPlayers = prev.players.filter(p => p.id !== newPlayer.id);
         const newState = {
             ...prev,
             players: [...filteredPlayers, playerToAdd]
         };
         
-        // Broadcast immediately to update everyone's lobby list
         broadcastState(newState);
         return newState;
     });
@@ -256,18 +239,15 @@ export default function App() {
     });
   };
 
-  // --- Logic Helper ---
-  const recalculateRoomObstacles = (room: Room, allPlayers: Player[]) => {
+  const recalculateRoomObstacles = (room: Room, allPlayers: Player[], now: number) => {
       const playersHere = allPlayers.filter(p => p.currentRoomId === room.id);
       
       room.activeObstacles.forEach(obs => {
           if (obs.isDefeated) return;
           if (obs.card.keyRequirement) return;
 
-          // Start with permanent damage (for boss types)
           obs.currentSuccesses = { ...obs.permanentSuccesses };
 
-          // Iterate all requirements to sum up locked dice
           const requiredStats = Object.keys(obs.card.requirements) as StatType[];
           
           requiredStats.forEach(stat => {
@@ -275,25 +255,20 @@ export default function App() {
               
               playersHere.forEach(p => {
                  p.dicePool.forEach(d => {
-                     // Check if locked to this obs AND matching face
                      if (d.lockedToObstacleId === obs.id && d.currentValue === stat) {
                          const faceIndex = d.faces.indexOf(d.currentValue);
-                         const dieMultiplier = d.multipliers[faceIndex] || 1;
+                         let diePower = d.multipliers[faceIndex] || 1;
                          
-                         // Class Bonus Check
-                         let classMultiplier = 1;
                          if (p.heroClass && CLASS_BONUS[p.heroClass] === d.currentValue) {
-                             classMultiplier = 2; 
+                             diePower *= 2; 
                          }
 
-                         // Item Bonuses
-                         let itemBonus = 0;
                          p.inventory.forEach(itemId => {
                              const def = ITEM_REGISTRY[itemId];
-                             if (def?.bonusStat === d.currentValue) itemBonus += (def.bonusAmount || 0);
+                             if (def?.bonusStat === d.currentValue) diePower += (def.bonusAmount || 0);
                          });
                          
-                         statPower += (dieMultiplier * classMultiplier) + itemBonus;
+                         statPower += diePower;
                      }
                  });
               });
@@ -301,42 +276,33 @@ export default function App() {
               obs.currentSuccesses[stat] = statPower;
           });
 
-          // Check if ALL requirements are met
+          const isSupercharged = room.superChargeUnlockTime > now;
           const allMet = requiredStats.every(stat => {
               const current = obs.currentSuccesses[stat] || 0;
-              const needed = obs.card.requirements[stat] || 0;
+              let needed = obs.card.requirements[stat] || 0;
+              if (isSupercharged) needed *= 2;
               return current >= needed;
           });
 
           if (allMet) {
               obs.isDefeated = true;
               
-              // Unlock dice used on this
               playersHere.forEach(p => {
                   p.dicePool.forEach(d => {
-                      if (d.lockedToObstacleId === obs.id) {
-                          d.lockedToObstacleId = null;
-                      }
+                      if (d.lockedToObstacleId === obs.id) d.lockedToObstacleId = null;
                   });
-                  // Grant progression
                   p.obstaclesDefeatedCount++;
-                  if (p.obstaclesDefeatedCount % 2 === 0) {
-                      p.upgradePoints++;
-                  }
+                  if (p.obstaclesDefeatedCount % 2 === 0) p.upgradePoints++;
               });
 
-              if (obs.card.specialRules?.reward === 'LOOT_DROP') {
-                   room.items.push(getRandomLoot());
-              }
+              if (obs.card.specialRules?.reward === 'LOOT_DROP') room.items.push(getRandomLoot());
           }
       });
   };
 
-  // --- Action Processor (Pure) ---
   const processGameAction = (state: GameState, action: GameAction): GameState => {
-      // Use DEEP COPY to avoid mutation issues
       const draft: GameState = JSON.parse(JSON.stringify(state));
-      
+      const now = Date.now();
       const getRoom = (id: string) => draft.map[id];
 
       if (action.type === 'START_GAME') {
@@ -344,10 +310,8 @@ export default function App() {
           draft.timer = GAME_DURATION;
           draft.map = generateMap();
           
-          // Draw Initial Hand
           for(let i=0; i<3; i++) draft.dmHand.push(drawCard(GAME_DURATION));
 
-          // Setup Players
           const startRoom = Object.values(draft.map).find(r => r.isStart);
           draft.players.forEach(p => {
               p.currentRoomId = startRoom?.id || '0,0';
@@ -358,13 +322,13 @@ export default function App() {
               }
           });
       }
-
       else if (action.type === 'RESET_LOBBY') {
           draft.status = 'LOBBY';
           draft.timer = GAME_DURATION;
           draft.dmResources = 8;
           draft.dmHand = [];
           draft.map = {};
+          draft.lastSuperChargeTime = 0;
           draft.players.forEach(p => {
               p.currentRoomId = '0,0';
               p.previousRoomId = null;
@@ -378,7 +342,13 @@ export default function App() {
               p.obstaclesDefeatedCount = 0;
           });
       }
-
+      else if (action.type === 'SUPER_CHARGE_ROOM') {
+          const room = getRoom(action.roomId);
+          if (room && now - draft.lastSuperChargeTime > SUPERCHARGE_COOLDOWN) {
+              room.superChargeUnlockTime = now + SUPERCHARGE_DURATION;
+              draft.lastSuperChargeTime = now;
+          }
+      }
       else if (action.type === 'ESCAPE_DUNGEON') {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player && !player.isMoving) {
@@ -388,7 +358,6 @@ export default function App() {
               }
           }
       }
-
       else if (action.type === 'MOVE') {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player && !player.isMoving && player.role === PlayerRole.HERO) {
@@ -402,13 +371,9 @@ export default function App() {
 
               if (currentRoom.connections.includes(nextId)) {
                   player.isMoving = true;
-                  player.moveUnlockTime = Date.now() + MOVEMENT_DELAY;
-                  
-                  // Unlock all dice when leaving
+                  player.moveUnlockTime = now + MOVEMENT_DELAY;
                   player.dicePool.forEach(d => d.lockedToObstacleId = null);
-                  
-                  recalculateRoomObstacles(currentRoom, draft.players);
-
+                  recalculateRoomObstacles(currentRoom, draft.players, now);
                   player.previousRoomId = player.currentRoomId;
                   player.currentRoomId = nextId;
                   if (!player.visitedRooms.includes(nextId)) {
@@ -417,7 +382,6 @@ export default function App() {
               }
           }
       }
-
       else if (action.type === 'USE_DIE') {
           const player = draft.players.find(p => p.id === action.playerId);
           const room = player ? getRoom(player.currentRoomId) : null;
@@ -431,33 +395,26 @@ export default function App() {
                   
                   if (obstacle.card.specialRules?.accumulatesDamage) {
                       const requiredAmount = obstacle.card.requirements[die.currentValue];
-                      
                       if (requiredAmount && requiredAmount > 0) {
                           let hitPower = multiplier;
                           if (player.heroClass && CLASS_BONUS[player.heroClass] === die.currentValue) {
                               hitPower *= 2; 
                           }
-
                           player.inventory.forEach(itemId => {
                               const def = ITEM_REGISTRY[itemId];
                               if (def?.bonusStat === die.currentValue) hitPower += (def.bonusAmount || 0);
                           });
-
                           const prev = obstacle.permanentSuccesses[die.currentValue] || 0;
                           obstacle.permanentSuccesses[die.currentValue] = prev + hitPower;
                       }
-                      
                       die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
-
                   } else {
                       die.lockedToObstacleId = obstacle.id;
                   }
-                  
-                  recalculateRoomObstacles(room, draft.players);
+                  recalculateRoomObstacles(room, draft.players, now);
               }
           }
       }
-
       else if (action.type === 'UNLOCK_DIE') {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player) {
@@ -465,14 +422,12 @@ export default function App() {
               if (die.lockedToObstacleId) {
                   die.lockedToObstacleId = null;
                   const room = getRoom(player.currentRoomId);
-                  recalculateRoomObstacles(room, draft.players);
+                  recalculateRoomObstacles(room, draft.players, now);
               }
           }
       }
-
       else if (action.type === 'REROLL') {
           const player = draft.players.find(p => p.id === action.playerId);
-          const now = Date.now();
           if (player && now - player.lastRerollTime >= REROLL_COOLDOWN) {
               player.dicePool.forEach(die => {
                   if (!die.lockedToObstacleId) {
@@ -482,7 +437,6 @@ export default function App() {
               player.lastRerollTime = now;
           }
       }
-
       else if (action.type === 'UPGRADE_DIE') {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player && player.upgradePoints > 0) {
@@ -493,7 +447,6 @@ export default function App() {
               }
           }
       }
-
       else if (action.type === 'PICKUP_ITEM') {
           const player = draft.players.find(p => p.id === action.playerId);
           const room = player ? getRoom(player.currentRoomId) : null;
@@ -502,15 +455,13 @@ export default function App() {
               if (itemIndex > -1) {
                   const itemId = room.items.splice(itemIndex, 1)[0];
                   player.inventory.push(itemId);
-                  
                   const def = ITEM_REGISTRY[itemId];
                   if (def?.grantsExtraDie) {
-                      player.dicePool.push(generateStandardDie(`die-${player.id}-${Date.now()}`));
+                      player.dicePool.push(generateStandardDie(`die-${player.id}-${now}`));
                   }
               }
           }
       }
-
       else if (action.type === 'DROP_ITEM') {
           const player = draft.players.find(p => p.id === action.playerId);
           const room = player ? getRoom(player.currentRoomId) : null;
@@ -519,23 +470,19 @@ export default function App() {
                if (idx > -1) {
                    player.inventory.splice(idx, 1);
                    room.items.push(action.itemId);
-                   
                    const def = ITEM_REGISTRY[action.itemId];
-                   if (def?.grantsExtraDie && player.dicePool.length > 2) {
+                   if (def?.grantsExtraDie && player.dicePool.length > 4) { // Only remove if > starter
                        player.dicePool.pop(); 
                    }
                }
           }
       }
-
       else if (action.type === 'USE_ITEM') {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player) {
               const idx = player.inventory.indexOf(action.itemId);
               if (idx > -1) {
                   const def = ITEM_REGISTRY[action.itemId];
-                  let consumed = false;
-                  
                   if (def?.effectType === 'TELEPORT') {
                       player.inventory.splice(idx, 1);
                       const startRoom = Object.values(draft.map).find((r: any) => r.isStart);
@@ -545,7 +492,6 @@ export default function App() {
                           player.moveUnlockTime = 0;
                           player.dicePool.forEach(d => d.lockedToObstacleId = null);
                       }
-                      consumed = true;
                   } 
                   else if (def?.effectType === 'TELEPORT_OTHERS') {
                       player.inventory.splice(idx, 1);
@@ -557,12 +503,10 @@ export default function App() {
                               otherP.dicePool.forEach(d => d.lockedToObstacleId = null);
                           }
                       });
-                      consumed = true;
                   }
                   else if (def?.effectType === 'GRANT_UPGRADE') {
                       player.inventory.splice(idx, 1);
                       player.upgradePoints += 1;
-                      consumed = true;
                   }
                   else if (def?.effectType === 'NUKE_OBSTACLE' && def.targetStat) {
                       const room = getRoom(player.currentRoomId);
@@ -572,16 +516,13 @@ export default function App() {
                                   obs.isDefeated = true;
                               }
                           });
+                          recalculateRoomObstacles(room, draft.players, now);
                       }
                       player.inventory.splice(idx, 1);
-                      consumed = true;
-                      
-                      if (room) recalculateRoomObstacles(room, draft.players);
                   }
               }
           }
       }
-
       else if (action.type === 'UNLOCK_OBSTACLE') {
           const player = draft.players.find(p => p.id === action.playerId);
           const room = player ? getRoom(player.currentRoomId) : null;
@@ -592,37 +533,31 @@ export default function App() {
               }
           }
       }
-
       else if (action.type === 'DM_PLACE_TRAP') {
-          if (draft.dmResources >= 1) { 
-              const card = draft.dmHand.find(c => c.id === action.cardId);
-              const room = getRoom(action.roomId);
-              const playersInRoom = draft.players.filter(p => p.currentRoomId === action.roomId);
-
-              if (card && room && draft.dmResources >= card.cost && playersInRoom.length === 0 && room.activeObstacles.length === 0) {
-                  draft.dmResources -= card.cost;
-                  draft.dmHand = draft.dmHand.filter(c => c.id !== action.cardId);
-                  
-                  const newObstacle: RoomObstacle = {
-                      id: `obs-${Date.now()}`,
-                      card: card,
-                      currentSuccesses: {},
-                      permanentSuccesses: {},
-                      isDefeated: false
-                  };
-                  room.activeObstacles.push(newObstacle);
-
-                  while(draft.dmHand.length < 3) {
-                      draft.dmHand.push(drawCard(draft.timer));
-                  }
+          const card = draft.dmHand.find(c => c.id === action.cardId);
+          const room = getRoom(action.roomId);
+          const playersInRoom = draft.players.filter(p => p.currentRoomId === action.roomId);
+          if (card && room && draft.dmResources >= card.cost && playersInRoom.length === 0 && room.activeObstacles.length === 0) {
+              draft.dmResources -= card.cost;
+              draft.dmHand = draft.dmHand.filter(c => c.id !== action.cardId);
+              const newObstacle: RoomObstacle = {
+                  id: `obs-${now}`, card, currentSuccesses: {}, permanentSuccesses: {}, isDefeated: false
+              };
+              room.activeObstacles.push(newObstacle);
+              while(draft.dmHand.length < 3) {
+                  draft.dmHand.push(drawCard(draft.timer));
               }
           }
       }
-
       else if (action.type === 'UPDATE_PLAYER') {
           const pIndex = draft.players.findIndex(p => p.id === action.playerId);
           if (pIndex !== -1) {
+              // Merge data, but don't overwrite name if it's not provided
+              const currentName = draft.players[pIndex].name;
               draft.players[pIndex] = { ...draft.players[pIndex], ...action.data };
+              if (!action.data.name) {
+                  draft.players[pIndex].name = currentName;
+              }
           }
       }
 
@@ -632,27 +567,13 @@ export default function App() {
   const handleHostGame = (name: string) => {
     setIsHost(true);
     const hostPlayer: Player = {
-        id: peerId!,
-        name: name,
-        role: PlayerRole.HERO, 
-        heroClass: HeroClass.FIGHTER,
-        currentRoomId: '0,0',
-        previousRoomId: null,
-        visitedRooms: ['0,0'],
-        dicePool: [],
-        inventory: [],
-        isMoving: false,
-        moveUnlockTime: 0,
-        lastRerollTime: 0,
-        upgradePoints: 0,
-        obstaclesDefeatedCount: 0
+        id: peerId!, name, role: PlayerRole.HERO, heroClass: HeroClass.FIGHTER, currentRoomId: '0,0',
+        previousRoomId: null, visitedRooms: ['0,0'], dicePool: [], inventory: [], isMoving: false,
+        moveUnlockTime: 0, lastRerollTime: 0, upgradePoints: 0, obstaclesDefeatedCount: 0
     };
     setGameState(prev => ({
-        ...prev,
-        players: [hostPlayer],
-        localPlayerId: peerId!
+        ...prev, players: [hostPlayer], localPlayerId: peerId!
     }));
-    dispatchAction({ type: 'START_GAME' });
   };
 
   const dispatchAction = (action: GameAction) => {
@@ -695,10 +616,10 @@ export default function App() {
           isHost={isHost}
           onHostGame={handleHostGame}
           onJoinGame={connectToHost}
-          onUpdatePlayer={(role, heroClass, name) => {
-              tempProfileRef.current = { role, heroClass, name };
+          onUpdatePlayer={(data) => {
+              if (data.name) tempProfileRef.current.name = data.name;
               if (gameState.localPlayerId) {
-                  dispatchAction({ type: 'UPDATE_PLAYER', playerId: gameState.localPlayerId, data: { role, heroClass, name } });
+                  dispatchAction({ type: 'UPDATE_PLAYER', playerId: gameState.localPlayerId, data });
               }
           }}
           onStartGame={() => dispatchAction({ type: 'START_GAME' })}
@@ -710,6 +631,7 @@ export default function App() {
              <DungeonMasterView 
                 gameState={gameState} 
                 onPlaceCard={(card, roomId) => dispatchAction({ type: 'DM_PLACE_TRAP', cardId: card.id, roomId })}
+                onSupercharge={(roomId) => dispatchAction({ type: 'SUPER_CHARGE_ROOM', roomId })}
              />
           ) : (
              gameState.localPlayerId && (

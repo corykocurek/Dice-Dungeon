@@ -103,6 +103,7 @@ export interface Room {
   connections: string[]; // IDs of connected rooms
   activeObstacles: RoomObstacle[];
   items: string[]; // IDs of items on the floor (e.g., 'RED_KEY')
+  superChargeUnlockTime: number; // Timestamp when supercharge effect wears off
 }
 
 export interface GameState {
@@ -116,6 +117,7 @@ export interface GameState {
   localPlayerId: string | null;
   lastResourceTick: number;
   lastCardDrawTick: number;
+  lastSuperChargeTime: number; // Timestamp for DM global cooldown
 }
 
 // Network & Action Types
@@ -136,6 +138,7 @@ export type GameAction =
   | { type: 'REROLL'; playerId: string }
   | { type: 'UPGRADE_DIE'; playerId: string; dieIndex: number; faceIndex: number }
   | { type: 'DM_PLACE_TRAP'; cardId: string; roomId: string }
+  | { type: 'SUPER_CHARGE_ROOM'; roomId: string }
   | { type: 'START_GAME' }
   | { type: 'PLAYER_JOIN'; player: Player }
   | { type: 'UPDATE_PLAYER'; playerId: string; data: Partial<Player> }

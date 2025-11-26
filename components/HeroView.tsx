@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { GameState, Player, Room, Die, StatType, RoomObstacle } from '../types';
+import { GameState, Player, Room, Die, StatType, RoomObstacle, HeroClass } from '../types';
 import { Room3D } from './Room3D';
 import { RetroButton, Panel, ProgressBar } from './RetroComponents';
 import { STAT_COLORS, STAT_BG_COLORS, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, MAP_SIZE, ITEM_REGISTRY } from '../constants';
-import { Dices, Activity, Map as MapIcon, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Ban, RefreshCw, Zap, Lock, Unlock, Undo2, X, Sword, SquareStack, Star, Key, Backpack, Grid3X3, ChevronDown, ChevronUp, Trash2, Info, Sparkles, CheckCircle, DoorOpen } from 'lucide-react';
+import { Dices, Activity, Map as MapIcon, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Ban, RefreshCw, Zap, Lock, Unlock, Undo2, X, Sword, SquareStack, Star, Key, Backpack, Grid3X3, ChevronDown, ChevronUp, Trash2, Info, Sparkles, CheckCircle, DoorOpen, Shield, Book, Cross, Axe, Music, User } from 'lucide-react';
 
 interface HeroProps {
   gameState: GameState;
@@ -20,6 +20,15 @@ interface HeroProps {
   onUnlockObstacle: (obstacleId: string) => void;
   onEscape: () => void;
 }
+
+const CLASS_ICONS: Record<HeroClass, React.ElementType> = {
+    [HeroClass.FIGHTER]: Shield,
+    [HeroClass.ROGUE]: Zap,
+    [HeroClass.WIZARD]: Book,
+    [HeroClass.CLERIC]: Cross,
+    [HeroClass.BARBARIAN]: Axe,
+    [HeroClass.BARD]: Music,
+};
 
 export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRoll, onUnlock, onReroll, onUpgrade, onPickup, onDrop, onUseItem, onUnlockObstacle, onEscape }) => {
   const currentRoom = gameState.map[player.currentRoomId];
@@ -194,6 +203,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
               const knownItem = isVisited && room.items.length > 0;
               const knownObstacle = isVisited && room.activeObstacles.some(o => !o.isDefeated);
+              const otherPlayers = gameState.players.filter(p => p.currentRoomId === id && p.id !== player.id);
 
               grid.push(
                   <div key={id} className={`w-8 h-8 relative flex items-center justify-center border
@@ -209,7 +219,11 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                           </>
                       )}
                       
-                      {isCurrent && <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>}
+                      {isCurrent && React.createElement(CLASS_ICONS[player.heroClass!], { className: "w-4 h-4 text-blue-300 animate-pulse" })}
+                      {otherPlayers.map((p, i) => {
+                          const Icon = p.heroClass ? CLASS_ICONS[p.heroClass] : User;
+                          return <Icon key={i} className="w-3 h-3 text-green-400 absolute" style={{ transform: `translate(${i*3}px, ${i*3}px)`}} />;
+                      })}
                       {!isCurrent && knownItem && <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>}
                       {!isCurrent && knownObstacle && <div className="w-2 h-2 bg-red-500 rounded-sm"></div>}
                   </div>
@@ -244,7 +258,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                      const isVisited = player.visitedRooms.includes(nid);
                      
                      // Indicators
-                     const hasOtherHero = gameState.players.some(p => p.id !== player.id && p.currentRoomId === nid);
+                     const otherPlayersHere = gameState.players.filter(p => p.id !== player.id && p.currentRoomId === nid);
                      const hasItem = roomData.items.length > 0;
                      const hasObs = roomData.activeObstacles.some(o => !o.isDefeated);
                      
@@ -255,10 +269,13 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                      else bg = "bg-black"; // Not connected
                      
                      return (
-                         <div key={nid} className={`w-4 h-4 ${bg} flex items-center justify-center border border-black/50 text-[8px]`}>
-                             {hasOtherHero && <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>}
-                             {isVisited && hasItem && !hasOtherHero && <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>}
-                             {isVisited && hasObs && !hasItem && !hasOtherHero && <div className="w-1.5 h-1.5 bg-red-500 rounded-sm"></div>}
+                         <div key={nid} className={`w-4 h-4 ${bg} flex items-center justify-center border border-black/50 text-[8px] relative`}>
+                            {otherPlayersHere.map((p, i) => {
+                                const Icon = p.heroClass ? CLASS_ICONS[p.heroClass] : User;
+                                return <Icon key={i} className="w-2 h-2 text-green-400 absolute" style={{transform: `translate(${i*2}px, ${i*2}px)`}} />;
+                            })}
+                            {isVisited && hasItem && otherPlayersHere.length === 0 && <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>}
+                            {isVisited && hasObs && !hasItem && otherPlayersHere.length === 0 && <div className="w-1.5 h-1.5 bg-red-500 rounded-sm"></div>}
                          </div>
                      );
                  })
@@ -431,15 +448,17 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                   {!activeObstacle.card.keyRequirement ? (
                       <div className="flex-1 w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           {(Object.entries(activeObstacle.card.requirements) as [StatType, number][]).map(([stat, required]) => {
+                                 const isSupercharged = currentRoom.superChargeUnlockTime > Date.now();
+                                 const finalRequired = isSupercharged ? required * 2 : required;
                                  const current = activeObstacle.currentSuccesses[stat] || 0;
                                  return (
-                                     <div key={stat} className="flex items-center gap-2">
+                                     <div key={stat} className={`flex items-center gap-2 ${isSupercharged ? 'animate-pulse' : ''}`}>
                                          <span className="text-[10px] font-bold w-16 text-right uppercase text-slate-400 tracking-tighter">{stat}</span>
                                          <div className={`w-3 h-3 rounded-full shrink-0 ${STAT_BG_COLORS[stat]}`}></div>
                                          <div className="flex-1 min-w-[60px]">
-                                             <ProgressBar value={current} max={required} color="bg-green-500" />
+                                             <ProgressBar value={current} max={finalRequired} color="bg-green-500" />
                                          </div>
-                                         <div className="text-[10px] font-mono w-8 text-right text-yellow-500">{current}/{required}</div>
+                                         <div className={`text-[10px] font-mono w-8 text-right ${isSupercharged ? 'text-purple-400' : 'text-yellow-500'}`}>{current}/{finalRequired}</div>
                                      </div>
                                  )
                            })}
@@ -489,7 +508,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                 <div className="flex flex-col flex-1 pt-2">
                     {/* Sub-mode: ROLL View */}
                     {diceMode === 'ROLL' && (
-                        <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                        <div className="flex flex-row overflow-x-auto gap-2 flex-1 w-full pb-2 items-start">
                             {player.dicePool.map((die, idx) => {
                                 const isLocked = !!die.lockedToObstacleId;
                                 // Effective if obstacle has this req
@@ -499,7 +518,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                 const multiplier = die.multipliers[faceIndex] || 1;
                                 
                                 return (
-                                    <div key={die.id} className={`p-2 border-2 flex flex-col items-center gap-1 transition-colors 
+                                    <div key={die.id} className={`min-w-[80px] p-2 border-2 flex flex-col items-center gap-1 transition-colors shrink-0
                                         ${isLocked ? 'bg-slate-900 border-slate-700 opacity-75' : 'bg-slate-800 border-slate-600'}
                                         ${isEffective ? 'border-yellow-400 bg-slate-750' : ''}
                                     `}>
@@ -701,6 +720,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                   </div>
                   <div className="mt-4 flex gap-4 text-[10px] uppercase text-slate-400 justify-center">
                       <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 border border-blue-300"></div>You</div>
+                      <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 border border-green-300"></div>Ally</div>
                       <div className="flex items-center gap-1"><div className="w-2 h-2 bg-yellow-500 rounded-full"></div>Item</div>
                       <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-sm"></div>Traps</div>
                   </div>
