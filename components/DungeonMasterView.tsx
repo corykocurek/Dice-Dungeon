@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { GameState, Room, ObstacleCard, Player, StatType, HeroClass, PlayerRole } from '../types';
 import { Panel, RetroButton, ProgressBar } from './RetroComponents';
 import { MAP_SIZE, OBSTACLE_DECK, STAT_COLORS, RED_KEY_ID, RED_DOOR_CARD, RESOURCE_TICK_INTERVAL, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION } from '../constants';
-import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music, Brain, Flame } from 'lucide-react';
+import { Lock, User, Eye, X, Key, DoorOpen, Ban, RefreshCw, Sword, Gift, Shield, Zap, Book, Cross, Axe, Music, Brain, Flame, Check } from 'lucide-react';
 
 interface DMProps {
   gameState: GameState;
@@ -114,6 +114,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                         const hasKey = room.items.includes(RED_KEY_ID);
                         const hasRedDoor = room.activeObstacles.some(o => o.card.keyRequirement === RED_KEY_ID);
                         const isSupercharged = room.superChargeUnlockTime > currentTime;
+                        const recentActivity = room.recentSuccesses && room.recentSuccesses.length > 0;
                         
                         const x = room.x;
                         const y = room.y;
@@ -186,6 +187,15 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                              {room.activeObstacles.map(obs => (
                                                  <div key={obs.id} className={`w-1.5 h-1.5 rounded-sm ${obs.isDefeated ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                              ))}
+                                         </div>
+                                     )}
+                                     
+                                     {/* Activity Checkmark */}
+                                     {recentActivity && (
+                                         <div className="absolute -top-1 -right-1 z-50 animate-bounce">
+                                             <div className="bg-green-500 rounded-full p-0.5 border border-white shadow">
+                                                 <Check className="w-3 h-3 text-white" />
+                                             </div>
                                          </div>
                                      )}
                                 </div>
@@ -313,38 +323,48 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                     key={card.id}
                                     onClick={() => canAfford && setSelectedCardId(isSelected ? null : card.id)}
                                     className={`
-                                        relative p-3 border-2 transition-all cursor-pointer
+                                        relative p-2 border-2 transition-all cursor-pointer flex flex-row md:flex-col gap-2
                                         ${isSelected ? 'bg-red-900 border-red-400 translate-x-1 md:translate-x-2 shadow-lg shadow-red-900/50' : 'bg-slate-800 border-slate-600'}
                                         ${!canAfford ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-slate-400'}
                                     `}
                                 >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-bold text-sm text-slate-200">{card.name}</span>
-                                        <div className="flex gap-1 items-center">
-                                            {card.tier === 'ADVANCED' && <span className="text-[8px] bg-purple-900 text-purple-200 px-1 rounded">ADV</span>}
-                                            {card.tier === 'NEUTRAL' && <span className="text-[8px] bg-blue-900 text-blue-200 px-1 rounded">MID</span>}
-                                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${canAfford ? 'bg-yellow-600 text-white' : 'bg-red-900 text-red-300'}`}>
-                                                {card.cost}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mb-2">{card.description}</div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {(Object.entries(card.requirements) as [StatType, number][]).map(([stat, req]) => (
-                                             <div key={stat} className="text-[10px] uppercase font-mono bg-black/30 px-1.5 py-0.5 rounded text-slate-300 border border-slate-700">
-                                                 {req} {stat}
-                                             </div>
-                                        ))}
+                                    {/* Image - Left on mobile, Top on desktop */}
+                                    <div className="w-16 h-16 md:w-full md:h-32 bg-black border border-slate-700 shrink-0 relative">
+                                        <img src={card.imageUrl} className="w-full h-full object-contain [image-rendering:pixelated]" />
+                                        <div className="absolute top-1 right-1 text-[8px] bg-slate-700 text-white px-1 rounded md:hidden">{card.cost}</div>
                                     </div>
 
-                                    {(card.specialRules && Object.keys(card.specialRules).length > 0) && (
-                                        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-700/50">
-                                            {card.specialRules.accumulatesDamage && <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1.5 py-0.5 rounded border border-yellow-700 text-[9px] text-yellow-200 font-bold"><Sword className="w-3 h-3" /> HP</div>}
-                                            {card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold"><Ban className="w-3 h-3" /> NO ESCAPE</div>}
-                                            {card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold"><RefreshCw className="w-3 h-3" /> REGEN</div>}
-                                            {card.specialRules.reward && <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold"><Gift className="w-3 h-3" /> LOOT</div>}
+                                    <div className="flex-1 flex flex-col">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="font-bold text-sm text-slate-200 leading-tight">{card.name}</span>
+                                            <div className="hidden md:flex gap-1 items-center">
+                                                {card.tier === 'ADVANCED' && <span className="text-[8px] bg-purple-900 text-purple-200 px-1 rounded">ADV</span>}
+                                                {card.tier === 'NEUTRAL' && <span className="text-[8px] bg-blue-900 text-blue-200 px-1 rounded">MID</span>}
+                                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${canAfford ? 'bg-yellow-600 text-white' : 'bg-red-900 text-red-300'}`}>
+                                                    {card.cost}
+                                                </span>
+                                            </div>
                                         </div>
-                                    )}
+                                        
+                                        <div className="text-[10px] text-slate-400 mb-1 leading-tight">{card.description}</div>
+                                        
+                                        <div className="flex flex-wrap gap-1 mt-auto">
+                                            {(Object.entries(card.requirements) as [StatType, number][]).map(([stat, req]) => (
+                                                <div key={stat} className="text-[9px] uppercase font-mono bg-black/30 px-1 rounded text-slate-300 border border-slate-700">
+                                                    {req} {stat}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {(card.specialRules && Object.keys(card.specialRules).length > 0) && (
+                                            <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-700/50">
+                                                {card.specialRules.accumulatesDamage && <div className="flex items-center gap-0.5 bg-yellow-900/50 px-1 rounded border border-yellow-700 text-[8px] text-yellow-200 font-bold"><Sword className="w-3 h-3" /> HP</div>}
+                                                {card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 bg-red-900/50 px-1 rounded border border-red-700 text-[8px] text-red-200 font-bold"><Ban className="w-3 h-3" /> NO ESCAPE</div>}
+                                                {card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 bg-purple-900/50 px-1 rounded border border-purple-700 text-[8px] text-purple-200 font-bold"><RefreshCw className="w-3 h-3" /> REGEN</div>}
+                                                {card.specialRules.reward && <div className="flex items-center gap-0.5 bg-green-900/50 px-1 rounded border border-green-700 text-[8px] text-green-200 font-bold"><Gift className="w-3 h-3" /> LOOT</div>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}

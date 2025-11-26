@@ -109,6 +109,10 @@ export default function App() {
                     }
                 });
             }
+            // Cleanup recent successes (>2s)
+            if (room.recentSuccesses) {
+                room.recentSuccesses = room.recentSuccesses.filter((t: number) => now - t < 2000);
+            }
         });
 
         newState.players = newState.players.map((p: Player) => {
@@ -146,15 +150,42 @@ export default function App() {
 
     peer.on('error', (err: any) => {
         console.error("PeerJS Error:", err);
-        setConnectionError(`Network Error: ${err.type || 'Unknown'}`);
+        
+        // Auto-reconnect on network/server errors
+        if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'disconnected' || (err.message && err.message.includes('Lost connection'))) {
+             // Only show reconnecting state if we aren't already playing (to avoid UI flicker during play if P2P is fine)
+             // However, for now, let's just try to reconnect without changing state if connected, 
+             // or change to RECONNECTING if we were initializing.
+             if (peerStatus !== 'CONNECTED') {
+                 setPeerStatus('RECONNECTING');
+             }
+             
+             if (peer && !peer.destroyed) {
+                 setTimeout(() => peer.reconnect(), 1000);
+             }
+             return;
+        }
+
+        // Peer Unavailable is common when joining bad IDs
+        if (err.type === 'peer-unavailable') {
+             setConnectionError(`Game Code not found. Check the ID.`);
+             setPeerStatus('ERROR');
+             return;
+        }
+
+        setConnectionError(`Network Error: ${err.type || err.message || 'Unknown'}`);
         setPeerStatus('ERROR');
     });
 
     peer.on('disconnected', () => {
         console.log("Peer disconnected from server. Attempting reconnect...");
-        setPeerStatus('RECONNECTING');
+        if (peerStatus !== 'CONNECTED') {
+             setPeerStatus('RECONNECTING');
+        }
         if (peer && !peer.destroyed) {
-            peer.reconnect();
+            setTimeout(() => {
+                 if (peer && !peer.destroyed) peer.reconnect();
+            }, 1000);
         }
     });
 
@@ -295,9 +326,13 @@ export default function App() {
           if (obs.isDefeated) return;
           if (obs.card.keyRequirement) return;
 
+          // Store prev state to detect increase
+          const previousSuccesses = { ...obs.currentSuccesses };
+
           obs.currentSuccesses = { ...obs.permanentSuccesses };
 
           const requiredStats = Object.keys(obs.card.requirements) as StatType[];
+          let anyIncrease = false;
           
           requiredStats.forEach(stat => {
               let statPower = obs.currentSuccesses[stat] || 0;
@@ -323,7 +358,15 @@ export default function App() {
               });
               
               obs.currentSuccesses[stat] = statPower;
+              if (statPower > (previousSuccesses[stat] || 0)) {
+                  anyIncrease = true;
+              }
           });
+
+          if (anyIncrease) {
+              room.recentSuccesses = room.recentSuccesses || [];
+              room.recentSuccesses.push(now);
+          }
 
           const isSupercharged = room.superChargeUnlockTime > now;
           const allMet = requiredStats.every(stat => {
@@ -524,6 +567,10 @@ export default function App() {
                           });
                           const prev = obstacle.permanentSuccesses[die.currentValue] || 0;
                           obstacle.permanentSuccesses[die.currentValue] = prev + hitPower;
+                          
+                          // Register visual success for accumulation
+                          room.recentSuccesses = room.recentSuccesses || [];
+                          room.recentSuccesses.push(now);
                       }
                       die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
                   } else {

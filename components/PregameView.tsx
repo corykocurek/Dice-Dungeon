@@ -1,9 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GameState, Player, PlayerRole, StatType, Die, ObstacleCard } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
 import { STAT_COLORS, STAT_BG_COLORS, ASSETS } from '../constants';
-import { Shield, Zap, Book, Cross, Axe, Music, Check, Star } from 'lucide-react';
+import { Shield, Zap, Book, Cross, Axe, Music, Check, Star, Sword, Ban, RefreshCw, Gift } from 'lucide-react';
 
 interface PregameProps {
   gameState: GameState;
@@ -15,6 +15,15 @@ interface PregameProps {
 
 export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, onDraftDie, onDraftCard, onReady }) => {
   const isDM = localPlayer.role === PlayerRole.DM;
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  const handleDraft = () => {
+      if (selectedIndex !== null) {
+          if (isDM) onDraftCard(selectedIndex);
+          else onDraftDie(selectedIndex);
+          setSelectedIndex(null);
+      }
+  };
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 gap-6">
@@ -49,8 +58,11 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                           {isDM ? (
                               gameState.dmDraftOptions.map((card, idx) => (
                                   <div key={card.id} 
-                                       onClick={() => onDraftCard(idx)}
-                                       className="bg-slate-800 border-2 border-slate-600 p-2 cursor-pointer hover:border-red-500 hover:bg-slate-700 transition-all flex flex-col gap-2 group relative">
+                                       onClick={() => setSelectedIndex(idx)}
+                                       className={`
+                                            bg-slate-800 border-2 p-2 cursor-pointer transition-all flex flex-col gap-2 group relative
+                                            ${selectedIndex === idx ? 'border-yellow-400 ring-2 ring-yellow-400/50' : 'border-slate-600 hover:border-red-500 hover:bg-slate-700'}
+                                       `}>
                                        <div className="w-full aspect-square bg-black border border-slate-700 relative">
                                             <img src={card.imageUrl} className="w-full h-full object-contain [image-rendering:pixelated]" />
                                             <div className="absolute top-1 right-1 text-[8px] bg-slate-700 text-white px-1 rounded">{card.tier}</div>
@@ -64,13 +76,25 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                                 </div>
                                             ))}
                                        </div>
+                                       {/* Special Modifiers Display */}
+                                       {(card.specialRules && Object.keys(card.specialRules).length > 0) && (
+                                            <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-700/50">
+                                                {card.specialRules.accumulatesDamage && <div className="flex items-center gap-0.5 text-[8px] text-yellow-500"><Sword className="w-3 h-3" /></div>}
+                                                {card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 text-[8px] text-red-500"><Ban className="w-3 h-3" /></div>}
+                                                {card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 text-[8px] text-purple-500"><RefreshCw className="w-3 h-3" /></div>}
+                                                {card.specialRules.reward && <div className="flex items-center gap-0.5 text-[8px] text-green-500"><Gift className="w-3 h-3" /></div>}
+                                            </div>
+                                        )}
                                   </div>
                               ))
                           ) : (
                               localPlayer.draftDieOptions.map((die, idx) => (
                                   <div key={die.id}
-                                       onClick={() => onDraftDie(idx)}
-                                       className="bg-slate-800 border-2 border-slate-600 p-4 cursor-pointer hover:border-yellow-400 hover:bg-slate-700 transition-all flex flex-col items-center gap-4 group">
+                                       onClick={() => setSelectedIndex(idx)}
+                                       className={`
+                                            bg-slate-800 border-2 p-4 cursor-pointer transition-all flex flex-col items-center gap-4 group
+                                            ${selectedIndex === idx ? 'border-yellow-400 ring-2 ring-yellow-400/50' : 'border-slate-600 hover:border-yellow-400 hover:bg-slate-700'}
+                                       `}>
                                        
                                        <div className={`w-16 h-16 rounded-xl border-4 flex items-center justify-center bg-slate-900 ${STAT_COLORS[die.faces[0]]}`}>
                                             <div className={`w-8 h-8 rounded-full ${STAT_BG_COLORS[die.faces[0]]}`}></div>
@@ -91,6 +115,16 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                   </div>
                               ))
                           )}
+                      </div>
+                      
+                      <div className="mt-auto pt-4 flex justify-center">
+                          <RetroButton 
+                            className="w-full max-w-xs py-3 text-lg" 
+                            disabled={selectedIndex === null}
+                            onClick={handleDraft}
+                          >
+                              PICK SELECTED
+                          </RetroButton>
                       </div>
                   </div>
               )}

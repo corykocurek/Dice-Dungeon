@@ -54,6 +54,12 @@ export const generateDraftDie = (id: string, powerLevel: number): Die => {
         multipliers.push(Math.random() < multChance ? 2 : 1);
     }
     
+    // Guarantee at least one multiplier if powerLevel > 0
+    if (powerLevel > 0 && !multipliers.includes(2)) {
+        const randIdx = Math.floor(Math.random() * 6);
+        multipliers[randIdx] = 2;
+    }
+    
     const currentValue = faces[0];
     return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
 };
@@ -107,6 +113,7 @@ export const generateMap = (): Record<string, Room> => {
         activeObstacles: [],
         items: [],
         superChargeUnlockTime: 0,
+        recentSuccesses: [],
       };
     }
   }

@@ -298,7 +298,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-200">
+    <div className="flex flex-col h-dvh bg-slate-900 text-slate-200 overflow-hidden">
       
       {/* 3D Viewport */}
       <div className="relative h-[40vh] md:flex-1 bg-black shrink-0 perspective-container">
@@ -331,9 +331,9 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
             </div>
         </div>
 
-        {/* Success Popup (Fixed Positioning for Mobile) */}
+        {/* Success Popup (Centered using absolute inside relative container) */}
         {successMsg && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-bounce-slow pointer-events-none w-[90%] max-w-sm">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] animate-bounce-slow pointer-events-none w-[90%] max-w-sm">
                  <div className="bg-green-900/90 border-2 border-green-500 p-4 rounded-xl shadow-2xl flex items-center gap-2 justify-center backdrop-blur-md">
                      <CheckCircle className="w-8 h-8 text-green-300 shrink-0" />
                      <div className="flex flex-col overflow-hidden">
@@ -448,7 +448,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
       {/* ENCOUNTER BAR - BETWEEN VIEWPORT AND CONTROLS */}
       {activeObstacle && !player.isMoving && (
-          <div className="bg-red-900 border-t-4 border-b-4 border-red-950 p-2 shadow-inner z-30">
+          <div className="bg-red-900 border-t-4 border-b-4 border-red-950 p-2 shadow-inner z-30 shrink-0">
               <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4 justify-between">
                   
                   {/* Title & Icons */}
@@ -494,10 +494,10 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       )}
 
       {/* Control Panel */}
-      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-hidden">
         
         {/* Left: Stats & Dice & Inventory */}
-        <div className="bg-slate-900 border-4 border-double border-slate-600 p-4 relative shadow-lg min-h-[220px] md:min-h-0 flex flex-col">
+        <div className="bg-slate-900 border-4 border-double border-slate-600 p-4 relative shadow-lg min-h-0 flex flex-col overflow-hidden">
             
             {/* Tabs */}
             <div className="flex gap-1 absolute -top-4 left-4">
@@ -526,7 +526,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
             {/* Tab Content: DICE */}
             {activeTab === 'DICE' && (
-                <div className="flex flex-col flex-1 pt-2">
+                <div className="flex flex-col flex-1 pt-2 min-h-0">
                     {/* Sub-mode: ROLL View */}
                     {diceMode === 'ROLL' && (
                         <div className="flex flex-row overflow-x-auto gap-2 flex-1 w-full pb-2 items-start">
@@ -579,7 +579,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                             {player.dicePool.map((die, dieIdx) => (
                                 <div key={die.id} className="bg-slate-950 p-2 border border-slate-700">
                                      <div className="text-[10px] text-slate-500 mb-1">DICE {dieIdx + 1}</div>
-                                     <div className="grid grid-cols-6 gap-1">
+                                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
                                          {die.faces.map((face, faceIdx) => {
                                              const mult = die.multipliers[faceIdx];
                                              const canUpgrade = isUpgradeMode && player.upgradePoints > 0;
@@ -610,7 +610,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                         </div>
                     )}
 
-                    <div className="mt-2 pt-2 border-t border-slate-700 flex gap-2">
+                    <div className="mt-2 pt-2 border-t border-slate-700 flex gap-2 shrink-0">
                         {diceMode === 'ROLL' ? (
                             <RetroButton 
                                 className={`flex-1 flex items-center justify-center gap-2 ${rerollCooldownRemaining > 0 ? 'grayscale opacity-50' : ''}`}
@@ -647,7 +647,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
             {/* Tab Content: ITEMS */}
             {activeTab === 'ITEMS' && (
-                 <div className="flex flex-col flex-1 pt-2 overflow-y-auto">
+                 <div className="flex flex-col flex-1 pt-2 overflow-y-auto min-h-0">
                     {player.inventory.length === 0 && (
                         <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm">
                             No items collected...
@@ -717,7 +717,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         </div>
 
         {/* Center: Interaction / Log */}
-        <Panel className="flex flex-col relative min-h-[150px] md:min-h-0">
+        <Panel className="flex flex-col relative min-h-0 md:min-h-0">
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 mb-2">
                 {combatLog.length === 0 && <div className="text-slate-600 italic">It is quiet... too quiet.</div>}
                 {combatLog.map((log, i) => (

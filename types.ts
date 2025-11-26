@@ -109,6 +109,7 @@ export interface Room {
   activeObstacles: RoomObstacle[];
   items: string[]; // IDs of items on the floor (e.g., 'RED_KEY')
   superChargeUnlockTime: number; // Timestamp when supercharge effect wears off
+  recentSuccesses: number[]; // Timestamps of recent success events (for DM visual)
 }
 
 export interface GameState {
