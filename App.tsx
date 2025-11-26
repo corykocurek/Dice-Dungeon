@@ -25,6 +25,7 @@ export default function App() {
   const [isHost, setIsHost] = useState(false);
   const [peerId, setPeerId] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [peerStatus, setPeerStatus] = useState<'INITIALIZING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR'>('INITIALIZING');
   
   // Network Refs
   const peerRef = useRef<any>(null);
@@ -95,23 +96,29 @@ export default function App() {
   const initPeer = () => {
     if (peerRef.current) return;
     
-    setConnectionError(null);
-    const peer = new Peer(); 
+    setPeerStatus('INITIALIZING');
+    const peer = new Peer(undefined, {
+      // Send a heartbeat every 5 seconds to keep the connection alive
+      pingInterval: 5000 
+    }); 
     peerRef.current = peer;
     
     peer.on('open', (id: string) => {
       console.log('My peer ID is: ' + id);
       setPeerId(id);
+      setPeerStatus('CONNECTED');
       setConnectionError(null);
     });
 
     peer.on('error', (err: any) => {
         console.error("PeerJS Error:", err);
         setConnectionError(`Network Error: ${err.type || 'Unknown'}`);
+        setPeerStatus('ERROR');
     });
 
     peer.on('disconnected', () => {
         console.log("Peer disconnected from server. Attempting reconnect...");
+        setPeerStatus('RECONNECTING');
         if (peer && !peer.destroyed) {
             peer.reconnect();
         }
@@ -552,7 +559,6 @@ export default function App() {
       else if (action.type === 'UPDATE_PLAYER') {
           const pIndex = draft.players.findIndex(p => p.id === action.playerId);
           if (pIndex !== -1) {
-              // Merge data, but don't overwrite name if it's not provided
               const currentName = draft.players[pIndex].name;
               draft.players[pIndex] = { ...draft.players[pIndex], ...action.data };
               if (!action.data.name) {
@@ -585,26 +591,44 @@ export default function App() {
         }
     }
   };
+  
+  const renderConnectionStatus = () => {
+      switch (peerStatus) {
+        case 'INITIALIZING':
+          return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-200 font-mono gap-4">
+              <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              <div>INITIALIZING NETWORK...</div>
+            </div>
+          );
+        case 'RECONNECTING':
+          return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-yellow-400 font-mono gap-4">
+              <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              <div>CONNECTION INTERRUPTED. RECONNECTING...</div>
+            </div>
+          );
+        case 'ERROR':
+           return (
+              <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-red-400 font-mono gap-4 p-4 text-center">
+                  <div className="text-2xl">CONNECTION ERROR</div>
+                  <div>{connectionError}</div>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white mt-4"
+                  >
+                      RETRY CONNECTION
+                  </button>
+              </div>
+          );
+        case 'CONNECTED':
+            return null; // Render the main app
+      }
+  };
 
-  if (!peerId && !connectionError) return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-200 font-mono gap-4">
-          <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-          <div>INITIALIZING NETWORK...</div>
-      </div>
-  );
+  const connectionStatusUI = renderConnectionStatus();
+  if (connectionStatusUI) return connectionStatusUI;
 
-  if (connectionError) return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-red-400 font-mono gap-4 p-4 text-center">
-          <div className="text-2xl">CONNECTION ERROR</div>
-          <div>{connectionError}</div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white mt-4"
-          >
-              RETRY CONNECTION
-          </button>
-      </div>
-  );
 
   return (
     <>
