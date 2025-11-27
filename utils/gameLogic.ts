@@ -1,7 +1,6 @@
 
-
 import { Room, ObstacleCard, StatType, RoomObstacle, Die } from '../types';
-import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DURATION } from '../constants';
+import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DURATION, CORE_STATS } from '../constants';
 
 const getFilteredDeck = (gameTimer?: number): Omit<ObstacleCard, 'id'>[] => {
     if (gameTimer === undefined) return OBSTACLE_DECK; 
@@ -16,23 +15,25 @@ const getFilteredDeck = (gameTimer?: number): Omit<ObstacleCard, 'id'>[] => {
     }
 }
 
+export const createCardInstance = (template: Omit<ObstacleCard, 'id'> | ObstacleCard): ObstacleCard => {
+    return {
+        ...template,
+        id: `card-play-${Date.now()}-${Math.random()}`
+    };
+};
+
 export const drawCard = (gameTimer: number = 0, sourceDeck?: ObstacleCard[]): ObstacleCard => {
   if (sourceDeck && sourceDeck.length > 0) {
-      // Draw from drafted deck
+      // Draw from drafted deck (Random Fallback if used directly, but App.tsx now handles sequential)
       const idx = Math.floor(Math.random() * sourceDeck.length);
       const card = sourceDeck[idx];
-      // Note: In a real TCG we remove it, but here the DM "hand" refills from the "deck" indefinitely?
-      // The prompt implies "use for the game". Let's assume the deck is a pool.
-      return { ...card, id: `card-play-${Date.now()}-${Math.random()}` };
+      return createCardInstance(card);
   }
   
   // Fallback if no drafted deck
   const deck = getFilteredDeck(gameTimer);
   const template = deck[Math.floor(Math.random() * deck.length)];
-  return {
-    ...template,
-    id: `card-${Date.now()}-${Math.random()}`
-  };
+  return createCardInstance(template);
 };
 
 export const getRandomLoot = (): string => {
@@ -40,24 +41,28 @@ export const getRandomLoot = (): string => {
 };
 
 // Draft Helpers
-export const generateDraftDie = (id: string, powerLevel: number): Die => {
-    const allStats = Object.values(StatType);
+export const generateDraftDie = (id: string, draftStep: number): Die => {
+    // CORE_STATS exclude GOLD/EXP for standard face generation
     const faces: StatType[] = [];
     const multipliers: number[] = [];
 
     for (let i = 0; i < 6; i++) {
-        faces.push(allStats[Math.floor(Math.random() * allStats.length)]);
-        // powerLevel 0: no multipliers
-        // powerLevel 1: 10% chance of x2
-        // powerLevel 2: 30% chance of x2
-        const multChance = powerLevel === 0 ? 0 : (powerLevel === 1 ? 0.1 : 0.3);
+        faces.push(CORE_STATS[Math.floor(Math.random() * CORE_STATS.length)]);
+        // draftStep 0 (Die 1): 10% chance x2
+        // draftStep 1 (Die 2): 30% chance x2
+        const multChance = draftStep === 0 ? 0.1 : 0.3;
         multipliers.push(Math.random() < multChance ? 2 : 1);
     }
     
-    // Guarantee at least one multiplier if powerLevel > 0
-    if (powerLevel > 0 && !multipliers.includes(2)) {
-        const randIdx = Math.floor(Math.random() * 6);
-        multipliers[randIdx] = 2;
+    // Special Faces logic based on Draft Step
+    if (draftStep === 0) {
+        // Die 2 Options: Must have GOLD
+        const goldFaceIndex = Math.floor(Math.random() * 6);
+        faces[goldFaceIndex] = StatType.GOLD;
+    } else if (draftStep === 1) {
+        // Die 3 Options: Must have EXP
+        const expFaceIndex = Math.floor(Math.random() * 6);
+        faces[expFaceIndex] = StatType.EXP;
     }
     
     const currentValue = faces[0];
@@ -261,12 +266,11 @@ export const rollDie = (dieFace: StatType): StatType => {
 
 export const generateStandardDie = (id: string): Die => {
   // Randomly assign 6 faces from the pool
-  const allStats = Object.values(StatType);
   const faces: StatType[] = [];
   const multipliers: number[] = [];
   
   for (let i = 0; i < 6; i++) {
-    faces.push(allStats[Math.floor(Math.random() * allStats.length)]);
+    faces.push(CORE_STATS[Math.floor(Math.random() * CORE_STATS.length)]);
     multipliers.push(1); // Default multiplier 1x
   }
   
@@ -276,7 +280,7 @@ export const generateStandardDie = (id: string): Die => {
 
 export const generateBalancedDie = (id: string): Die => {
   // Always has exactly one of each stat
-  const faces = Object.values(StatType);
+  const faces = [...CORE_STATS];
   const multipliers = [1, 1, 1, 1, 1, 1];
   
   const currentValue = faces[Math.floor(Math.random() * faces.length)];

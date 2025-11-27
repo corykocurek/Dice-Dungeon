@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { HeroClass, PlayerRole, Player, StatType } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
-import { Shield, Zap, Book, Cross, Users, Copy, Radio, ArrowRight, Library, Search, ChevronLeft, Axe, Music, Brain } from 'lucide-react';
+import { Shield, Zap, Book, Cross, Users, Copy, Radio, ArrowRight, Library, Search, ChevronLeft, Axe, Music, Brain, HelpCircle, Coins, Star, Swords, Skull, Map } from 'lucide-react';
 import { ITEM_REGISTRY, OBSTACLE_DECK, STAT_COLORS, STAT_BG_COLORS } from '../constants';
 import { ASSETS } from '../assets';
 
@@ -26,12 +27,15 @@ export const Lobby: React.FC<LobbyProps> = ({
   onUpdatePlayer,
   onStartGame
 }) => {
-  const [view, setView] = useState<'MENU' | 'HOST_SETUP' | 'JOINING' | 'ROOM' | 'ARCHIVES'>('MENU');
+  const [view, setView] = useState<'MENU' | 'HOST_SETUP' | 'JOINING' | 'ROOM' | 'ARCHIVES' | 'TUTORIAL'>('MENU');
   const [joinCode, setJoinCode] = useState('');
   const [name, setName] = useState('');
   
   // Archives State
   const [archiveTab, setArchiveTab] = useState<'ITEMS' | 'OBSTACLES'>('ITEMS');
+  
+  // Tutorial State
+  const [tutorialTab, setTutorialTab] = useState<'BASICS' | 'HEROES' | 'DM' | 'ADVANCED'>('BASICS');
   
   // Local selection state for when in the room
   const localPlayer = players.find(p => p.id === localPlayerId);
@@ -119,16 +123,249 @@ export const Lobby: React.FC<LobbyProps> = ({
                     JOIN GAME
                 </RetroButton>
             </div>
-            <RetroButton 
-                className="py-4 text-lg flex items-center justify-center gap-2" 
-                variant="outline" 
-                onClick={() => setView('ARCHIVES')}
-            >
-                <Library className="w-5 h-5" /> ARCHIVES
-            </RetroButton>
+            <div className="flex gap-4">
+                <RetroButton 
+                    className="flex-1 py-4 text-lg flex items-center justify-center gap-2" 
+                    variant="outline" 
+                    onClick={() => setView('TUTORIAL')}
+                >
+                    <HelpCircle className="w-5 h-5" /> HOW TO PLAY
+                </RetroButton>
+                <RetroButton 
+                    className="flex-1 py-4 text-lg flex items-center justify-center gap-2" 
+                    variant="outline" 
+                    onClick={() => setView('ARCHIVES')}
+                >
+                    <Library className="w-5 h-5" /> ARCHIVES
+                </RetroButton>
+            </div>
         </div>
       </div>
     );
+  }
+
+  if (view === 'TUTORIAL') {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-screen p-4 gap-4">
+              <Panel title="Adventurer's Guide" className="w-full max-w-4xl h-[80vh] flex flex-col">
+                  {/* Header & Tabs */}
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b border-slate-700 pb-4 gap-4">
+                      <div className="flex gap-2 flex-wrap justify-center">
+                          <RetroButton 
+                              variant={tutorialTab === 'BASICS' ? 'primary' : 'outline'}
+                              onClick={() => setTutorialTab('BASICS')}
+                              className="text-sm"
+                          >
+                              BASICS
+                          </RetroButton>
+                          <RetroButton 
+                              variant={tutorialTab === 'HEROES' ? 'primary' : 'outline'}
+                              onClick={() => setTutorialTab('HEROES')}
+                              className="text-sm"
+                          >
+                              HEROES
+                          </RetroButton>
+                          <RetroButton 
+                              variant={tutorialTab === 'DM' ? 'primary' : 'outline'}
+                              onClick={() => setTutorialTab('DM')}
+                              className="text-sm"
+                          >
+                              DUNGEON MASTER
+                          </RetroButton>
+                          <RetroButton 
+                              variant={tutorialTab === 'ADVANCED' ? 'primary' : 'outline'}
+                              onClick={() => setTutorialTab('ADVANCED')}
+                              className="text-sm"
+                          >
+                              ADVANCED
+                          </RetroButton>
+                      </div>
+                      <RetroButton variant="danger" onClick={() => setView('MENU')} className="px-3">
+                          <ChevronLeft className="w-4 h-4" /> BACK
+                      </RetroButton>
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="flex-1 overflow-y-auto pr-2 text-slate-300 leading-relaxed space-y-6 p-2">
+                      
+                      {tutorialTab === 'BASICS' && (
+                          <div className="flex flex-col gap-6 animate-in slide-in-from-right">
+                              <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                  <h3 className="text-yellow-400 font-retro text-lg mb-2 flex items-center gap-2"><Swords /> The Objective</h3>
+                                  <p className="mb-2">
+                                      Dice Dungeon is an <strong>asymmetrical multiplayer game</strong> (1 vs Many). 
+                                      A team of <strong>Heroes</strong> must explore a dungeon to find the <span className="text-red-500 font-bold">RED KEY</span>, unlock the <span className="text-red-500 font-bold">RED DOOR</span>, and escape through the <strong>EXIT</strong> before time runs out.
+                                  </p>
+                                  <p>
+                                      The <strong>Dungeon Master (DM)</strong> tries to stop them by placing traps and monsters to drain their time.
+                                  </p>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                      <h4 className="text-blue-300 font-bold mb-2 flex items-center gap-2"><Users /> Heroes Win If...</h4>
+                                      <ul className="list-disc list-inside space-y-1 text-sm">
+                                          <li>They locate the Red Key item on the floor.</li>
+                                          <li>They locate and unlock the Red Door obstacle.</li>
+                                          <li>They find the Exit Room.</li>
+                                          <li>They clear all active obstacles in the Exit Room.</li>
+                                          <li>They click the "ESCAPE" button before the timer hits 0:00.</li>
+                                      </ul>
+                                  </div>
+                                  <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                      <h4 className="text-red-400 font-bold mb-2 flex items-center gap-2"><Skull /> DM Wins If...</h4>
+                                      <ul className="list-disc list-inside space-y-1 text-sm">
+                                          <li>The timer reaches 0:00.</li>
+                                          <li>This usually means stalling heroes with tough obstacles.</li>
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                      {tutorialTab === 'HEROES' && (
+                          <div className="flex flex-col gap-6 animate-in slide-in-from-right">
+                              <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                  <h3 className="text-blue-300 font-retro text-lg mb-2">Role: The Hero</h3>
+                                  <p className="text-sm mb-4">
+                                      You are an adventurer with a specific <strong>Class</strong> (Fighter, Rogue, etc.). 
+                                      Your main tool is your <strong>Dice Pool</strong>.
+                                  </p>
+                                  
+                                  <div className="flex flex-col gap-4">
+                                      <div className="flex items-start gap-3">
+                                          <div className="bg-black p-2 border border-slate-600 rounded">
+                                              <Shield className="w-6 h-6 text-white" />
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-yellow-400">Classes & Stats</h4>
+                                              <p className="text-xs mt-1">
+                                                  There are 6 stats: <span className="text-red-500">Muscle</span>, <span className="text-yellow-400">Agility</span>, <span className="text-orange-500">Fortitude</span>, <span className="text-blue-400">Knowledge</span>, <span className="text-purple-400">Smarts</span>, and <span className="text-pink-400">Looks</span>.
+                                                  Your class gives you a <strong>x2 Bonus</strong> to one specific stat when you roll it.
+                                              </p>
+                                          </div>
+                                      </div>
+
+                                      <div className="flex items-start gap-3">
+                                          <div className="bg-black p-2 border border-slate-600 rounded">
+                                              <Coins className="w-6 h-6 text-yellow-400" />
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-yellow-400">Gold & The Shop</h4>
+                                              <p className="text-xs mt-1">
+                                                  Some dice faces are <span className="text-yellow-300 font-bold">GOLD</span>. 
+                                                  Use these dice (target "Self") to add Gold to your inventory.
+                                                  Spend Gold at the <strong>Shop</strong> (located in the Start Room) to buy powerful items and extra dice.
+                                              </p>
+                                          </div>
+                                      </div>
+
+                                      <div className="flex items-start gap-3">
+                                          <div className="bg-black p-2 border border-slate-600 rounded">
+                                              <Star className="w-6 h-6 text-purple-400" />
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-yellow-400">XP & Upgrades</h4>
+                                              <p className="text-xs mt-1">
+                                                  Some dice faces are <span className="text-purple-300 font-bold">EXP</span>. 
+                                                  Use these to gain Experience. Every 5 XP, you level up and gain an <strong>Upgrade Point</strong>.
+                                                  Use Upgrade Points to permanently upgrade a face on your <strong>First Die</strong> from x1 to x2 power.
+                                              </p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                      {tutorialTab === 'DM' && (
+                          <div className="flex flex-col gap-6 animate-in slide-in-from-right">
+                              <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                  <h3 className="text-red-400 font-retro text-lg mb-2">Role: Dungeon Master</h3>
+                                  <p className="text-sm mb-4">
+                                      You view the entire map. Your goal is to slow down the heroes using <strong>Mana</strong> and <strong>Trap Cards</strong>.
+                                  </p>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="p-3 bg-slate-900 border border-slate-700 rounded">
+                                          <h4 className="font-bold text-blue-300 mb-1">Mana System</h4>
+                                          <p className="text-xs text-slate-400">
+                                              You regenerate Mana over time (up to 10). 
+                                              Each Trap Card has a Mana cost (e.g., 3 Mana). 
+                                              You must wait for Mana to recharge to place powerful monsters.
+                                          </p>
+                                      </div>
+                                      <div className="p-3 bg-slate-900 border border-slate-700 rounded">
+                                          <h4 className="font-bold text-blue-300 mb-1">Placing Traps</h4>
+                                          <p className="text-xs text-slate-400">
+                                              Select a card from your hand, then click a room to place it.
+                                              <strong>Rules:</strong> You cannot place traps in a room that currently has Heroes inside or already has obstacles.
+                                          </p>
+                                      </div>
+                                      <div className="p-3 bg-slate-900 border border-slate-700 rounded">
+                                          <h4 className="font-bold text-blue-300 mb-1">Supercharge</h4>
+                                          <p className="text-xs text-slate-400">
+                                              Click a room to Inspect it, then click <strong>SUPERCHARGE</strong>. 
+                                              This doubles the difficulty of all obstacles in that room for 20 seconds. 
+                                              Has a 60s global cooldown. Use it when heroes are stuck!
+                                          </p>
+                                      </div>
+                                      <div className="p-3 bg-slate-900 border border-slate-700 rounded">
+                                          <h4 className="font-bold text-blue-300 mb-1">Drafting</h4>
+                                          <p className="text-xs text-slate-400">
+                                              Before the game starts, you draft your deck of 10 cards.
+                                              During the game, you draw from this deck. Balance low-cost annoyances with high-cost bosses.
+                                          </p>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                      {tutorialTab === 'ADVANCED' && (
+                          <div className="flex flex-col gap-6 animate-in slide-in-from-right">
+                              <div className="bg-slate-800 p-4 border border-slate-600 rounded">
+                                  <h3 className="text-purple-300 font-retro text-lg mb-2">Advanced Mechanics</h3>
+                                  
+                                  <div className="space-y-4">
+                                      <div>
+                                          <h4 className="font-bold text-yellow-400">Drafting Dice</h4>
+                                          <p className="text-xs text-slate-400 mt-1">
+                                              At the start, Heroes draft 2 extra dice. 
+                                              <strong>Die 2</strong> is guaranteed to have at least one Gold face. 
+                                              <strong>Die 3</strong> is guaranteed to have at least one Exp face. 
+                                              Choose wisely based on your strategy (Economy vs Leveling vs Raw Stats).
+                                          </p>
+                                      </div>
+
+                                      <div>
+                                          <h4 className="font-bold text-yellow-400">Obstacle Types</h4>
+                                          <ul className="list-disc list-inside text-xs text-slate-400 mt-1 space-y-1">
+                                              <li><strong>Standard:</strong> Lock a die to contribute to the requirement. Die is returned when obstacle is defeated.</li>
+                                              <li><strong>Accumulate HP:</strong> Dice are rolled instantly to deal damage. They are not locked. Good for high-HP bosses.</li>
+                                              <li><strong>No Escape:</strong> Players cannot move out of the room until this obstacle is cleared.</li>
+                                              <li><strong>Regenerating:</strong> If all players leave the room, this obstacle heals to full.</li>
+                                          </ul>
+                                      </div>
+
+                                      <div>
+                                          <h4 className="font-bold text-yellow-400">Items & Inventory</h4>
+                                          <p className="text-xs text-slate-400 mt-1">
+                                              Items can be found on the floor (Loot Drops) or bought in the Shop. 
+                                              <strong>Passive Items:</strong> (e.g., Sword) Add +1 to specific rolls automatically.
+                                              <strong>Active Items:</strong> (e.g., Scroll, Potion) Must be clicked to USE. 
+                                              <span className="italic"> Tip: Use the "Teleport Scroll" to quickly return to the Shop/Start!</span>
+                                          </p>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                  </div>
+              </Panel>
+          </div>
+      );
   }
 
   if (view === 'ARCHIVES') {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, PlayerRole, HeroClass, RoomObstacle, StatType, NetworkMessage, GameAction, Room, Die } from './types';
-import { generateMap, drawCard, rollDie, getRandomLoot, generateDraftDie, generateDraftCards, generateStarterDice } from './utils/gameLogic';
+import { generateMap, drawCard, rollDie, getRandomLoot, generateDraftDie, generateDraftCards, generateStarterDice, createCardInstance } from './utils/gameLogic';
 import { GAME_DURATION, PREGAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION, OBSTACLE_DECK } from './constants';
 import { Lobby } from './components/Lobby';
 import { DungeonMasterView } from './components/DungeonMasterView';
@@ -16,6 +16,7 @@ const INITIAL_STATE: GameState = {
   dmHand: [],
   dmDeck: [],
   dmDraftOptions: [],
+  dmDeckPointer: 0,
   players: [],
   map: {},
   localPlayerId: null,
@@ -59,9 +60,16 @@ export default function App() {
                  newState.timer = GAME_DURATION;
                  newState.lastResourceTick = now;
                  newState.lastCardDrawTick = now;
-                 // Fill DM hand if empty from deck or random
+                 newState.dmDeckPointer = 0;
+                 // Fill DM hand
                  while(newState.dmHand.length < 3) {
-                     newState.dmHand.push(drawCard(GAME_DURATION, newState.dmDeck));
+                     if (newState.dmDeck.length > 0) {
+                         const template = newState.dmDeck[newState.dmDeckPointer % newState.dmDeck.length];
+                         newState.dmHand.push(createCardInstance(template));
+                         newState.dmDeckPointer++;
+                     } else {
+                         newState.dmHand.push(drawCard(GAME_DURATION));
+                     }
                  }
             } else {
                 // Check readiness
@@ -70,8 +78,15 @@ export default function App() {
                     newState.timer = GAME_DURATION;
                     newState.lastResourceTick = now;
                     newState.lastCardDrawTick = now;
+                    newState.dmDeckPointer = 0;
                     while(newState.dmHand.length < 3) {
-                         newState.dmHand.push(drawCard(GAME_DURATION, newState.dmDeck));
+                         if (newState.dmDeck.length > 0) {
+                             const template = newState.dmDeck[newState.dmDeckPointer % newState.dmDeck.length];
+                             newState.dmHand.push(createCardInstance(template));
+                             newState.dmDeckPointer++;
+                         } else {
+                             newState.dmHand.push(drawCard(GAME_DURATION));
+                         }
                      }
                 }
             }
@@ -93,8 +108,14 @@ export default function App() {
         }
 
         if (now - prev.lastCardDrawTick > CARD_DRAW_INTERVAL) {
-            // Draw from DM Deck if possible
-            newState.dmHand.push(drawCard(newState.timer, newState.dmDeck));
+            // Draw from DM Deck sequentially
+            if (newState.dmDeck.length > 0) {
+                 const template = newState.dmDeck[newState.dmDeckPointer % newState.dmDeck.length];
+                 newState.dmHand.push(createCardInstance(template));
+                 newState.dmDeckPointer++;
+            } else {
+                 newState.dmHand.push(drawCard(newState.timer));
+            }
             newState.lastCardDrawTick = now;
         }
         
@@ -154,9 +175,6 @@ export default function App() {
         // Ignore lost connection errors to allow auto-reconnect logic to work without blocking UI
         if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'disconnected' || (err.message && err.message.includes('Lost connection'))) {
              console.warn("Connection lost, attempting auto-reconnect in background...");
-             // Do not set ERROR status here, let auto-reconnect happen
-             // Only set RECONNECTING if we are stuck for a while? 
-             // Actually, keeping UI interactive is better.
              return;
         }
 
@@ -173,7 +191,6 @@ export default function App() {
 
     peer.on('disconnected', () => {
         console.log("Peer disconnected from server. Attempting reconnect...");
-        // Do not show full screen error, just try to reconnect
         if (peer && !peer.destroyed) {
             setTimeout(() => {
                  if (peer && !peer.destroyed) peer.reconnect();
@@ -232,7 +249,10 @@ export default function App() {
                  obstaclesDefeatedCount: 0,
                  draftStep: 0,
                  draftDieOptions: [],
-                 isReady: false
+                 isReady: false,
+                 gold: 0,
+                 exp: 0,
+                 level: 1
              };
              conn.send({ type: 'JOIN_REQUEST', payload: joinReq });
         });
@@ -249,7 +269,6 @@ export default function App() {
         conn.on('error', (err: any) => {
             clearTimeout(timeout);
             console.error("Connection error:", err);
-            // Suppress alert for non-critical join errors if we want, but usually join error is critical.
             alert(`Could not connect to host: ${err.type || 'Unknown Error'}`);
         });
         
@@ -284,11 +303,10 @@ export default function App() {
             playerToAdd.currentRoomId = startRoom?.id || '0,0';
             playerToAdd.visitedRooms = [playerToAdd.currentRoomId];
             if (playerToAdd.role === PlayerRole.HERO) {
-                // If joining late, give standard dice instead of drafting
                 playerToAdd.dicePool = generateStarterDice();
+                // Late joiners get a couple balanced draft dice without selection
                 playerToAdd.dicePool.push(generateDraftDie(`d2-late`, 0));
-                playerToAdd.dicePool.push(generateDraftDie(`d3-late`, 0));
-                playerToAdd.dicePool.push(generateDraftDie(`d4-late`, 0));
+                playerToAdd.dicePool.push(generateDraftDie(`d3-late`, 1));
                 playerToAdd.inventory = ['ITEM_SCROLL']; 
             }
         }
@@ -376,8 +394,9 @@ export default function App() {
                   p.dicePool.forEach(d => {
                       if (d.lockedToObstacleId === obs.id) d.lockedToObstacleId = null;
                   });
-                  p.obstaclesDefeatedCount++;
-                  if (p.obstaclesDefeatedCount % 2 === 0) p.upgradePoints++;
+                  // REMOVED: Upgrade point on defeat
+                  // p.obstaclesDefeatedCount++;
+                  // if (p.obstaclesDefeatedCount % 2 === 0) p.upgradePoints++;
               });
 
               if (obs.card.specialRules?.reward === 'LOOT_DROP') room.items.push(getRandomLoot());
@@ -398,12 +417,16 @@ export default function App() {
           // Setup DM Draft Options (Start with Basic)
           draft.dmDraftOptions = generateDraftCards('BASIC', 3);
           draft.dmDeck = [];
+          draft.dmDeckPointer = 0;
 
           const startRoom = Object.values(draft.map as Record<string, Room>).find(r => r.isStart);
           draft.players.forEach(p => {
               p.currentRoomId = startRoom?.id || '0,0';
               p.visitedRooms = [p.currentRoomId];
               p.isReady = false;
+              p.gold = 0;
+              p.exp = 0;
+              p.level = 1;
               
               if (p.role === PlayerRole.HERO) {
                   p.dicePool = generateStarterDice(); // 1 balanced die
@@ -428,8 +451,8 @@ export default function App() {
                    player.draftStep++;
                    
                    // Prepare next step
-                   if (player.draftStep < 3) {
-                       const powerLevel = player.draftStep; // 0, 1, 2 increasing power
+                   if (player.draftStep < 2) { // Now only 2 draft steps (Total 3 dice)
+                       const powerLevel = player.draftStep; // 0 or 1
                        player.draftDieOptions = [
                           generateDraftDie('draft-1', powerLevel),
                           generateDraftDie('draft-2', powerLevel),
@@ -437,15 +460,13 @@ export default function App() {
                        ];
                    } else {
                        player.draftDieOptions = [];
-                       player.isReady = true; // Auto ready after 3 drafts (total 4 dice)
+                       player.isReady = true; 
                    }
                }
           }
       }
       else if (action.type === 'DRAFT_CARD') {
-          if (!isHost) return draft; // Only host/DM drives global state for cards logic usually, but here DM might not be host. 
-          // Actually, if DM is not host, they send action to Host.
-          // Host executes this logic.
+          if (!isHost) return draft; 
           
           if (draft.dmDeck.length < 10) {
               const selectedCard = draft.dmDraftOptions[action.cardIndex];
@@ -460,7 +481,6 @@ export default function App() {
                       draft.dmDraftOptions = generateDraftCards(tier, 3);
                   } else {
                       draft.dmDraftOptions = [];
-                      // Mark DM as ready
                       const dm = draft.players.find(p => p.role === PlayerRole.DM);
                       if (dm) dm.isReady = true;
                   }
@@ -477,6 +497,7 @@ export default function App() {
           draft.dmResources = 8;
           draft.dmHand = [];
           draft.dmDeck = [];
+          draft.dmDeckPointer = 0;
           draft.map = {};
           draft.lastSuperChargeTime = 0;
           draft.players.forEach(p => {
@@ -493,9 +514,11 @@ export default function App() {
               p.draftStep = 0;
               p.draftDieOptions = [];
               p.isReady = false;
+              p.gold = 0;
+              p.exp = 0;
+              p.level = 1;
           });
       }
-      // ... (Existing playing logic) ...
       else if (action.type === 'SUPER_CHARGE_ROOM') {
           const room = getRoom(action.roomId);
           if (room && now - draft.lastSuperChargeTime > SUPERCHARGE_COOLDOWN) {
@@ -541,6 +564,22 @@ export default function App() {
           const room = player ? getRoom(player.currentRoomId) : null;
           if (player && room && !player.isMoving) {
               const die = player.dicePool[action.dieIndex];
+              // Special Case: Gold/Exp Die
+              if (die && (die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP)) {
+                  if (die.currentValue === StatType.GOLD) {
+                      player.gold = (player.gold || 0) + 1;
+                  } else {
+                      player.exp = (player.exp || 0) + 1;
+                      if (player.exp >= 5) {
+                          player.exp -= 5;
+                          player.level++;
+                          player.upgradePoints++;
+                      }
+                  }
+                  die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
+                  return draft; // Skip standard logic
+              }
+
               const obstacle = room.activeObstacles.find(o => o.id === action.obstacleId);
               
               if (die && obstacle && !obstacle.isDefeated) {
@@ -597,9 +636,12 @@ export default function App() {
       }
       else if (action.type === 'UPGRADE_DIE') {
           const player = draft.players.find(p => p.id === action.playerId);
-          if (player && player.upgradePoints > 0) {
+          // Ensure upgrading die index 0 only
+          if (player && player.upgradePoints > 0 && action.dieIndex === 0) {
               const die = player.dicePool[action.dieIndex];
-              if (die && die.multipliers[action.faceIndex] === 1) { 
+              // Also ensure we don't upgrade special faces (GOLD/EXP)
+              const face = die.faces[action.faceIndex];
+              if (die && die.multipliers[action.faceIndex] === 1 && face !== StatType.GOLD && face !== StatType.EXP) { 
                   die.multipliers[action.faceIndex] = 2;
                   player.upgradePoints--;
               }
@@ -615,8 +657,19 @@ export default function App() {
                   player.inventory.push(itemId);
                   const def = ITEM_REGISTRY[itemId];
                   if (def?.grantsExtraDie) {
-                      // Note: In new draft system, extra die needs logic? 
-                      // Standard generic die for tool
+                      player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0)); // Level 0 extra die
+                  }
+              }
+          }
+      }
+      else if (action.type === 'BUY_ITEM') {
+          const player = draft.players.find(p => p.id === action.playerId);
+          if (player) {
+              const def = ITEM_REGISTRY[action.itemId];
+              if (def && player.gold >= def.price) {
+                  player.gold -= def.price;
+                  player.inventory.push(action.itemId);
+                  if (def.grantsExtraDie) {
                       player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0));
                   }
               }
@@ -631,7 +684,7 @@ export default function App() {
                    player.inventory.splice(idx, 1);
                    room.items.push(action.itemId);
                    const def = ITEM_REGISTRY[action.itemId];
-                   if (def?.grantsExtraDie && player.dicePool.length > 4) { 
+                   if (def?.grantsExtraDie && player.dicePool.length > 3) { // > 3 because base is 3 now
                        player.dicePool.pop(); 
                    }
                }
@@ -704,8 +757,16 @@ export default function App() {
                   id: `obs-${now}`, card, currentSuccesses: {}, permanentSuccesses: {}, isDefeated: false
               };
               room.activeObstacles.push(newObstacle);
+              
+              // Replenish Hand from Deck sequentially
               while(draft.dmHand.length < 3) {
-                  draft.dmHand.push(drawCard(draft.timer, draft.dmDeck));
+                  if (draft.dmDeck.length > 0) {
+                      const template = draft.dmDeck[draft.dmDeckPointer % draft.dmDeck.length];
+                      draft.dmHand.push(createCardInstance(template));
+                      draft.dmDeckPointer++;
+                  } else {
+                      draft.dmHand.push(drawCard(draft.timer));
+                  }
               }
           }
       }
@@ -729,7 +790,7 @@ export default function App() {
         id: peerId!, name, role: PlayerRole.HERO, heroClass: HeroClass.FIGHTER, currentRoomId: '0,0',
         previousRoomId: null, visitedRooms: ['0,0'], dicePool: [], inventory: [], isMoving: false,
         moveUnlockTime: 0, lastRerollTime: 0, upgradePoints: 0, obstaclesDefeatedCount: 0,
-        draftStep: 0, draftDieOptions: [], isReady: false
+        draftStep: 0, draftDieOptions: [], isReady: false, gold: 0, exp: 0, level: 1
     };
     setGameState(prev => ({
         ...prev, players: [hostPlayer], localPlayerId: peerId!
@@ -834,6 +895,7 @@ export default function App() {
                     onPickup={(itemId) => dispatchAction({ type: 'PICKUP_ITEM', playerId: gameState.localPlayerId!, itemId })}
                     onDrop={(itemId) => dispatchAction({ type: 'DROP_ITEM', playerId: gameState.localPlayerId!, itemId })}
                     onUseItem={(itemId) => dispatchAction({ type: 'USE_ITEM', playerId: gameState.localPlayerId!, itemId })}
+                    onBuyItem={(itemId) => dispatchAction({ type: 'BUY_ITEM', playerId: gameState.localPlayerId!, itemId })}
                     onUnlockObstacle={(obsId) => dispatchAction({ type: 'UNLOCK_OBSTACLE', playerId: gameState.localPlayerId!, obstacleId: obsId })}
                     onEscape={() => dispatchAction({ type: 'ESCAPE_DUNGEON', playerId: gameState.localPlayerId! })}
                  />

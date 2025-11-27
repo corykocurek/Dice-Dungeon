@@ -100,8 +100,10 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                        <div className="w-full grid grid-cols-3 gap-2">
                                             {die.faces.map((f, i) => (
                                                 <div key={i} className="flex flex-col items-center gap-1">
-                                                    <div className={`w-full aspect-square rounded border flex items-center justify-center relative ${STAT_BG_COLORS[f]}`}>
-                                                        {React.createElement(STAT_ICONS[f], { className: "w-2/3 h-2/3 opacity-50" })}
+                                                    <div className={`w-full aspect-square rounded-lg border-2 flex items-center justify-center relative bg-slate-900 ${STAT_COLORS[f]}`}>
+                                                        <div className={`w-3/4 h-3/4 rounded-full ${STAT_BG_COLORS[f]} flex items-center justify-center shadow-inner`}>
+                                                            {React.createElement(STAT_ICONS[f], { className: "w-2/3 h-2/3 text-white" })}
+                                                        </div>
                                                         {die.multipliers[i] > 1 && (
                                                             <div className="absolute -top-1 -right-1 text-[10px] bg-yellow-300 text-black font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-white">
                                                                 x{die.multipliers[i]}

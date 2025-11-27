@@ -1,9 +1,18 @@
 import React from 'react';
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
-import { Dumbbell, Wind, Heart, BookOpen, Brain, Crown } from 'lucide-react';
+import { Dumbbell, Wind, Heart, BookOpen, Brain, Crown, Coins, Star } from 'lucide-react';
 
 export { ASSETS };
+
+export const CORE_STATS = [
+    StatType.MUSCLE,
+    StatType.AGILITY,
+    StatType.FORTITUDE,
+    StatType.KNOWLEDGE,
+    StatType.SMARTS,
+    StatType.LOOKS
+];
 
 // Using Lucide Icons for Stats
 export const STAT_ICONS: Record<StatType, React.ElementType> = {
@@ -13,6 +22,8 @@ export const STAT_ICONS: Record<StatType, React.ElementType> = {
     [StatType.KNOWLEDGE]: BookOpen,
     [StatType.SMARTS]: Brain,
     [StatType.LOOKS]: Crown,
+    [StatType.GOLD]: Coins,
+    [StatType.EXP]: Star,
 };
 
 export const GAME_DURATION = 600; // 10 minutes in seconds
@@ -37,6 +48,8 @@ export const STAT_COLORS: Record<StatType, string> = {
   [StatType.KNOWLEDGE]: 'text-blue-400 border-blue-400',
   [StatType.SMARTS]: 'text-purple-400 border-purple-400',
   [StatType.LOOKS]: 'text-pink-400 border-pink-400',
+  [StatType.GOLD]: 'text-yellow-300 border-yellow-300',
+  [StatType.EXP]: 'text-purple-300 border-purple-300',
 };
 
 // Explicit background colors to ensure Tailwind includes them
@@ -47,6 +60,8 @@ export const STAT_BG_COLORS: Record<StatType, string> = {
   [StatType.KNOWLEDGE]: 'bg-blue-400',
   [StatType.SMARTS]: 'bg-purple-400',
   [StatType.LOOKS]: 'bg-pink-400',
+  [StatType.GOLD]: 'bg-yellow-500',
+  [StatType.EXP]: 'bg-purple-500',
 };
 
 export const CLASS_BONUS: Record<HeroClass, StatType> = {
@@ -64,41 +79,42 @@ export const ITEM_REGISTRY: Record<string, ItemDefinition> = {
         id: RED_KEY_ID,
         name: 'Red Key',
         description: 'Unlocks Red Doors.',
-        imageUrl: ASSETS.KEY_RED
+        imageUrl: ASSETS.KEY_RED,
+        price: 100 // Not buyable really
     },
-    'ITEM_SWORD': { id: 'ITEM_SWORD', name: 'Iron Sword', description: '+1 to Muscle rolls.', imageUrl: ASSETS.ITEM_SWORD, bonusStat: StatType.MUSCLE, bonusAmount: 1 },
-    'ITEM_SHIELD': { id: 'ITEM_SHIELD', name: 'Tower Shield', description: '+1 to Fortitude rolls.', imageUrl: ASSETS.ITEM_SHIELD, bonusStat: StatType.FORTITUDE, bonusAmount: 1 },
-    'ITEM_BOOTS': { id: 'ITEM_BOOTS', name: 'Elven Boots', description: '+1 to Agility rolls.', imageUrl: ASSETS.ITEM_BOOTS, bonusStat: StatType.AGILITY, bonusAmount: 1 },
-    'ITEM_BOOK': { id: 'ITEM_BOOK', name: 'Arcane Tome', description: '+1 to Knowledge rolls.', imageUrl: ASSETS.ITEM_BOOK, bonusStat: StatType.KNOWLEDGE, bonusAmount: 1 },
-    'ITEM_STAFF': { id: 'ITEM_STAFF', name: 'Elder Staff', description: '+1 to Smarts rolls.', imageUrl: ASSETS.ITEM_STAFF, bonusStat: StatType.SMARTS, bonusAmount: 1 },
-    'ITEM_TOOLS': { id: 'ITEM_TOOLS', name: 'Thieves Tools', description: 'Adds an Extra Die to your pool.', imageUrl: ASSETS.ITEM_TOOLS, grantsExtraDie: true },
-    'ITEM_SCROLL': { id: 'ITEM_SCROLL', name: 'Teleport Scroll', description: 'Teleport self to Start.', imageUrl: ASSETS.SCROLL, effectType: 'TELEPORT' },
+    'ITEM_SWORD': { id: 'ITEM_SWORD', name: 'Iron Sword', description: '+1 to Muscle rolls.', imageUrl: ASSETS.ITEM_SWORD, bonusStat: StatType.MUSCLE, bonusAmount: 1, price: 3 },
+    'ITEM_SHIELD': { id: 'ITEM_SHIELD', name: 'Tower Shield', description: '+1 to Fortitude rolls.', imageUrl: ASSETS.ITEM_SHIELD, bonusStat: StatType.FORTITUDE, bonusAmount: 1, price: 3 },
+    'ITEM_BOOTS': { id: 'ITEM_BOOTS', name: 'Elven Boots', description: '+1 to Agility rolls.', imageUrl: ASSETS.ITEM_BOOTS, bonusStat: StatType.AGILITY, bonusAmount: 1, price: 3 },
+    'ITEM_BOOK': { id: 'ITEM_BOOK', name: 'Arcane Tome', description: '+1 to Knowledge rolls.', imageUrl: ASSETS.ITEM_BOOK, bonusStat: StatType.KNOWLEDGE, bonusAmount: 1, price: 3 },
+    'ITEM_STAFF': { id: 'ITEM_STAFF', name: 'Elder Staff', description: '+1 to Smarts rolls.', imageUrl: ASSETS.ITEM_STAFF, bonusStat: StatType.SMARTS, bonusAmount: 1, price: 3 },
+    'ITEM_TOOLS': { id: 'ITEM_TOOLS', name: 'Thieves Tools', description: 'Adds an Extra Die to your pool.', imageUrl: ASSETS.ITEM_TOOLS, grantsExtraDie: true, price: 8 },
+    'ITEM_SCROLL': { id: 'ITEM_SCROLL', name: 'Teleport Scroll', description: 'Teleport self to Start.', imageUrl: ASSETS.SCROLL, effectType: 'TELEPORT', price: 2 },
     
     // New Items (20 total mixed)
-    'ITEM_SUMMON': { id: 'ITEM_SUMMON', name: 'Summoning Scroll', description: 'Teleports all allies to you.', imageUrl: ASSETS.SCROLL, effectType: 'TELEPORT_OTHERS' },
-    'ITEM_POTION_UPGRADE': { id: 'ITEM_POTION_UPGRADE', name: 'Potion of Growth', description: 'Gain 1 Upgrade Point.', imageUrl: ASSETS.POTION, effectType: 'GRANT_UPGRADE' },
+    'ITEM_SUMMON': { id: 'ITEM_SUMMON', name: 'Summoning Scroll', description: 'Teleports all allies to you.', imageUrl: ASSETS.SCROLL, effectType: 'TELEPORT_OTHERS', price: 4 },
+    'ITEM_POTION_UPGRADE': { id: 'ITEM_POTION_UPGRADE', name: 'Potion of Growth', description: 'Gain 1 Upgrade Point.', imageUrl: ASSETS.POTION, effectType: 'GRANT_UPGRADE', price: 10 },
     
     // Charms
-    'ITEM_CHARM_MUSCLE': { id: 'ITEM_CHARM_MUSCLE', name: 'Bear Charm', description: '+1 Muscle', imageUrl: ASSETS.CHARM, bonusStat: StatType.MUSCLE, bonusAmount: 1 },
-    'ITEM_CHARM_AGILITY': { id: 'ITEM_CHARM_AGILITY', name: 'Cat Charm', description: '+1 Agility', imageUrl: ASSETS.CHARM, bonusStat: StatType.AGILITY, bonusAmount: 1 },
-    'ITEM_CHARM_FORT': { id: 'ITEM_CHARM_FORT', name: 'Ox Charm', description: '+1 Fortitude', imageUrl: ASSETS.CHARM, bonusStat: StatType.FORTITUDE, bonusAmount: 1 },
-    'ITEM_CHARM_KNOW': { id: 'ITEM_CHARM_KNOW', name: 'Owl Charm', description: '+1 Knowledge', imageUrl: ASSETS.CHARM, bonusStat: StatType.KNOWLEDGE, bonusAmount: 1 },
-    'ITEM_CHARM_SMART': { id: 'ITEM_CHARM_SMART', name: 'Fox Charm', description: '+1 Smarts', imageUrl: ASSETS.CHARM, bonusStat: StatType.SMARTS, bonusAmount: 1 },
-    'ITEM_CHARM_LOOKS': { id: 'ITEM_CHARM_LOOKS', name: 'Swan Charm', description: '+1 Looks', imageUrl: ASSETS.CHARM, bonusStat: StatType.LOOKS, bonusAmount: 1 },
+    'ITEM_CHARM_MUSCLE': { id: 'ITEM_CHARM_MUSCLE', name: 'Bear Charm', description: '+1 Muscle', imageUrl: ASSETS.CHARM, bonusStat: StatType.MUSCLE, bonusAmount: 1, price: 5 },
+    'ITEM_CHARM_AGILITY': { id: 'ITEM_CHARM_AGILITY', name: 'Cat Charm', description: '+1 Agility', imageUrl: ASSETS.CHARM, bonusStat: StatType.AGILITY, bonusAmount: 1, price: 5 },
+    'ITEM_CHARM_FORT': { id: 'ITEM_CHARM_FORT', name: 'Ox Charm', description: '+1 Fortitude', imageUrl: ASSETS.CHARM, bonusStat: StatType.FORTITUDE, bonusAmount: 1, price: 5 },
+    'ITEM_CHARM_KNOW': { id: 'ITEM_CHARM_KNOW', name: 'Owl Charm', description: '+1 Knowledge', imageUrl: ASSETS.CHARM, bonusStat: StatType.KNOWLEDGE, bonusAmount: 1, price: 5 },
+    'ITEM_CHARM_SMART': { id: 'ITEM_CHARM_SMART', name: 'Fox Charm', description: '+1 Smarts', imageUrl: ASSETS.CHARM, bonusStat: StatType.SMARTS, bonusAmount: 1, price: 5 },
+    'ITEM_CHARM_LOOKS': { id: 'ITEM_CHARM_LOOKS', name: 'Swan Charm', description: '+1 Looks', imageUrl: ASSETS.CHARM, bonusStat: StatType.LOOKS, bonusAmount: 1, price: 5 },
 
     // Bombs (Nukes)
-    'ITEM_BOMB_FIRE': { id: 'ITEM_BOMB_FIRE', name: 'Fire Bomb', description: 'Destroy Agility traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.AGILITY },
-    'ITEM_BOMB_ICE': { id: 'ITEM_BOMB_ICE', name: 'Ice Bomb', description: 'Destroy Muscle traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.MUSCLE },
-    'ITEM_BOMB_ACID': { id: 'ITEM_BOMB_ACID', name: 'Acid Bomb', description: 'Destroy Fortitude traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.FORTITUDE },
-    'ITEM_BOMB_LIGHT': { id: 'ITEM_BOMB_LIGHT', name: 'Light Bomb', description: 'Destroy Knowledge traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.KNOWLEDGE },
-    'ITEM_BOMB_VOID': { id: 'ITEM_BOMB_VOID', name: 'Void Bomb', description: 'Destroy Smarts traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.SMARTS },
-    'ITEM_BOMB_GLAM': { id: 'ITEM_BOMB_GLAM', name: 'Glamour Bomb', description: 'Destroy Looks traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.LOOKS },
+    'ITEM_BOMB_FIRE': { id: 'ITEM_BOMB_FIRE', name: 'Fire Bomb', description: 'Destroy Agility traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.AGILITY, price: 4 },
+    'ITEM_BOMB_ICE': { id: 'ITEM_BOMB_ICE', name: 'Ice Bomb', description: 'Destroy Muscle traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.MUSCLE, price: 4 },
+    'ITEM_BOMB_ACID': { id: 'ITEM_BOMB_ACID', name: 'Acid Bomb', description: 'Destroy Fortitude traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.FORTITUDE, price: 4 },
+    'ITEM_BOMB_LIGHT': { id: 'ITEM_BOMB_LIGHT', name: 'Light Bomb', description: 'Destroy Knowledge traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.KNOWLEDGE, price: 4 },
+    'ITEM_BOMB_VOID': { id: 'ITEM_BOMB_VOID', name: 'Void Bomb', description: 'Destroy Smarts traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.SMARTS, price: 4 },
+    'ITEM_BOMB_GLAM': { id: 'ITEM_BOMB_GLAM', name: 'Glamour Bomb', description: 'Destroy Looks traps in room.', imageUrl: ASSETS.BOMB, effectType: 'NUKE_OBSTACLE', targetStat: StatType.LOOKS, price: 4 },
 
     // More Gear
-    'ITEM_HELM': { id: 'ITEM_HELM', name: 'Iron Helm', description: '+1 Fortitude', imageUrl: ASSETS.ITEM_SHIELD, bonusStat: StatType.FORTITUDE, bonusAmount: 1 },
-    'ITEM_DAGGER': { id: 'ITEM_DAGGER', name: 'Rusty Dagger', description: '+1 Agility', imageUrl: ASSETS.ITEM_SWORD, bonusStat: StatType.AGILITY, bonusAmount: 1 },
-    'ITEM_ROBE': { id: 'ITEM_ROBE', name: 'Silk Robe', description: '+1 Looks', imageUrl: ASSETS.ITEM_BOOK, bonusStat: StatType.LOOKS, bonusAmount: 1 },
-    'ITEM_RING': { id: 'ITEM_RING', name: 'Ring of Mind', description: '+1 Smarts', imageUrl: ASSETS.CHARM, bonusStat: StatType.SMARTS, bonusAmount: 1 },
+    'ITEM_HELM': { id: 'ITEM_HELM', name: 'Iron Helm', description: '+1 Fortitude', imageUrl: ASSETS.ITEM_SHIELD, bonusStat: StatType.FORTITUDE, bonusAmount: 1, price: 3 },
+    'ITEM_DAGGER': { id: 'ITEM_DAGGER', name: 'Rusty Dagger', description: '+1 Agility', imageUrl: ASSETS.ITEM_SWORD, bonusStat: StatType.AGILITY, bonusAmount: 1, price: 3 },
+    'ITEM_ROBE': { id: 'ITEM_ROBE', name: 'Silk Robe', description: '+1 Looks', imageUrl: ASSETS.ITEM_BOOK, bonusStat: StatType.LOOKS, bonusAmount: 1, price: 3 },
+    'ITEM_RING': { id: 'ITEM_RING', name: 'Ring of Mind', description: '+1 Smarts', imageUrl: ASSETS.CHARM, bonusStat: StatType.SMARTS, bonusAmount: 1, price: 3 },
 };
 
 export const LOOT_TABLE = [

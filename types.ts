@@ -1,17 +1,13 @@
 
-
-export enum PlayerRole {
-  HERO = 'HERO',
-  DM = 'DM'
-}
-
 export enum StatType {
   MUSCLE = 'MUSCLE',
   AGILITY = 'AGILITY',
   FORTITUDE = 'FORTITUDE',
   KNOWLEDGE = 'KNOWLEDGE',
   SMARTS = 'SMARTS',
-  LOOKS = 'LOOKS'
+  LOOKS = 'LOOKS',
+  GOLD = 'GOLD',
+  EXP = 'EXP',
 }
 
 export enum HeroClass {
@@ -20,96 +16,94 @@ export enum HeroClass {
   WIZARD = 'WIZARD',
   CLERIC = 'CLERIC',
   BARBARIAN = 'BARBARIAN',
-  BARD = 'BARD'
+  BARD = 'BARD',
 }
 
-export interface Die {
-  id: string;
-  faces: StatType[];
-  multipliers: number[]; // Array of 6 numbers, defaulting to 1. Upgrades make them 2.
-  currentValue: StatType;
-  lockedToObstacleId: string | null; // ID of obstacle this die is committed to
+export enum PlayerRole {
+  HERO = 'HERO',
+  DM = 'DM',
 }
 
 export interface ItemDefinition {
-  id: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  bonusStat?: StatType;
-  bonusAmount?: number; // +1 success to matching stat
-  grantsExtraDie?: boolean; // Tools
-  effectType?: 'TELEPORT' | 'TELEPORT_OTHERS' | 'NUKE_OBSTACLE' | 'GRANT_UPGRADE'; // Usable effect
-  targetStat?: StatType; // For NUKE_OBSTACLE
+    id: string;
+    name: string;
+    description: string;
+    imageUrl: string;
+    price: number;
+    bonusStat?: StatType;
+    bonusAmount?: number;
+    grantsExtraDie?: boolean;
+    effectType?: 'TELEPORT' | 'TELEPORT_OTHERS' | 'GRANT_UPGRADE' | 'NUKE_OBSTACLE';
+    targetStat?: StatType;
 }
-
-export interface Player {
-  id: string;
-  peerId?: string; // Network ID
-  name: string;
-  role: PlayerRole;
-  heroClass?: HeroClass;
-  currentRoomId: string; // "x,y" coordinate string
-  previousRoomId: string | null; // For retreat logic
-  visitedRooms: string[]; // List of room IDs visited
-  dicePool: Die[];
-  inventory: string[]; // Collected item IDs
-  isMoving: boolean;
-  moveUnlockTime: number; // Timestamp when movement finishes
-  lastRerollTime: number; // Timestamp for reroll cooldown
-  
-  // Upgrade Logic
-  upgradePoints: number;
-  obstaclesDefeatedCount: number; // Every 2 grants a point
-  
-  // Drafting
-  draftStep: number;
-  draftDieOptions: Die[];
-  isReady: boolean;
-}
-
-export interface ObstacleSpecialRules {
-  preventsRetreat?: boolean;
-  resetsOnLeave?: boolean;
-  accumulatesDamage?: boolean; // If true, dice aren't locked, they deal damage and reroll
-  reward?: 'EXTRA_DIE' | 'LOOT_DROP'; // If defeated, grants a reward
-}
-
-// Map of Stat -> Required Successes
-export type RequirementMap = Partial<Record<StatType, number>>;
 
 export interface ObstacleCard {
-  id: string;
-  name: string;
-  cost: number;
-  // Multi-stat requirements replacement
-  requirements: RequirementMap; 
-  description: string;
-  specialRules?: ObstacleSpecialRules;
-  keyRequirement?: string; // If set, requires this item ID to unlock
-  imageUrl?: string;
-  tier?: 'BASIC' | 'NEUTRAL' | 'ADVANCED';
+    id: string;
+    name: string;
+    cost: number;
+    requirements: Partial<Record<StatType, number>>;
+    description: string;
+    imageUrl: string;
+    tier?: 'BASIC' | 'NEUTRAL' | 'ADVANCED';
+    keyRequirement?: string;
+    specialRules?: {
+        preventsRetreat?: boolean;
+        resetsOnLeave?: boolean;
+        accumulatesDamage?: boolean;
+        reward?: 'LOOT_DROP';
+    };
 }
 
 export interface RoomObstacle {
-  id: string;
-  card: ObstacleCard;
-  currentSuccesses: RequirementMap; // Visual display of progress per stat
-  permanentSuccesses: RequirementMap; // For accumulating obstacles per stat
-  isDefeated: boolean;
+    id: string;
+    card: ObstacleCard;
+    currentSuccesses: Partial<Record<StatType, number>>;
+    permanentSuccesses: Partial<Record<StatType, number>>;
+    isDefeated: boolean;
 }
 
 export interface Room {
-  id: string; // "x,y"
-  x: number;
-  y: number;
-  isStart: boolean;
-  isExit: boolean;
-  connections: string[]; // IDs of connected rooms
-  activeObstacles: RoomObstacle[];
-  items: string[]; // IDs of items on the floor (e.g., 'RED_KEY')
-  superChargeUnlockTime: number; // Timestamp when supercharge effect wears off
-  recentSuccesses: number[]; // Timestamps of recent success events (for DM visual)
+    id: string;
+    x: number;
+    y: number;
+    isStart: boolean;
+    isExit: boolean;
+    connections: string[];
+    activeObstacles: RoomObstacle[];
+    items: string[];
+    superChargeUnlockTime: number;
+    recentSuccesses?: number[];
+}
+
+export interface Die {
+    id: string;
+    faces: StatType[];
+    multipliers: number[];
+    currentValue: StatType;
+    lockedToObstacleId: string | null;
+}
+
+export interface Player {
+    id: string;
+    name: string;
+    role: PlayerRole;
+    heroClass?: HeroClass;
+    currentRoomId: string;
+    previousRoomId: string | null;
+    visitedRooms: string[];
+    dicePool: Die[];
+    inventory: string[];
+    isMoving: boolean;
+    moveUnlockTime: number;
+    lastRerollTime: number;
+    upgradePoints: number;
+    obstaclesDefeatedCount: number;
+    draftStep: number;
+    draftDieOptions: Die[];
+    isReady: boolean;
+    gold: number;
+    exp: number;
+    level: number;
 }
 
 export interface GameState {
@@ -120,6 +114,7 @@ export interface GameState {
   dmHand: ObstacleCard[];
   dmDeck: ObstacleCard[]; // Drafted deck
   dmDraftOptions: ObstacleCard[]; // For pregame
+  dmDeckPointer: number; // Tracks the index of the next card to draw
   players: Player[];
   map: Record<string, Room>; // Map keyed by "x,y"
   localPlayerId: string | null;
@@ -142,6 +137,7 @@ export type GameAction =
   | { type: 'PICKUP_ITEM'; playerId: string; itemId: string }
   | { type: 'DROP_ITEM'; playerId: string; itemId: string }
   | { type: 'USE_ITEM'; playerId: string; itemId: string }
+  | { type: 'BUY_ITEM'; playerId: string; itemId: string }
   | { type: 'UNLOCK_OBSTACLE'; playerId: string; obstacleId: string }
   | { type: 'REROLL'; playerId: string }
   | { type: 'UPGRADE_DIE'; playerId: string; dieIndex: number; faceIndex: number }
