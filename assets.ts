@@ -26,14 +26,6 @@ export const ASSETS = {
   BOMB: HEADER + r(4,4,8,8,'#222') + r(7,2,2,2,'#666') + r(8,0,2,2,'#ea0') + r(5,5,2,2,'#444') + FOOTER,
   CHARM: HEADER + r(2,2,12,8,'#da4') + r(2,4,12,10,'#0000') + r(6,8,4,4,'#0f0') + FOOTER,
 
-  // --- STAT ICONS ---
-  ICON_MUSCLE: HEADER + r(4,6,8,8,'#fff') + r(2,8,2,4,'#fff') + r(12,8,2,4,'#fff') + r(6,2,4,4,'#fff') + FOOTER, // Flexed arm shape
-  ICON_AGILITY: HEADER + r(2,8,8,4,'#fff') + r(4,4,8,4,'#fff') + r(8,2,4,2,'#fff') + r(2,8,2,2,'#fff') + FOOTER, // Wing/Boot
-  ICON_FORTITUDE: HEADER + r(3,2,10,10,'#fff') + r(3,12,5,2,'#fff') + r(8,12,5,2,'#fff') + r(5,5,6,6,'#000') + FOOTER, // Shield
-  ICON_KNOWLEDGE: HEADER + r(2,4,12,8,'#fff') + r(8,4,1,8,'#000') + r(3,5,4,2,'#000') + r(9,5,4,2,'#000') + FOOTER, // Book
-  ICON_SMARTS: HEADER + r(6,2,4,6,'#fff') + r(4,4,8,4,'#fff') + r(6,10,4,2,'#fff') + r(6,13,4,1,'#fff') + FOOTER, // Lightbulb
-  ICON_LOOKS: HEADER + r(2,6,12,4,'#fff') + r(3,7,3,2,'#000') + r(10,7,3,2,'#000') + r(8,12,2,1,'#fff') + FOOTER, // Mask/Eyes
-
   // --- GENERIC MONSTERS (Fallbacks) ---
   MONSTER_SLIME: HEADER + r(2,10,12,6,'#4d4') + r(4,8,8,2,'#4d4') + r(4,10,2,2,'#000') + r(10,10,2,2,'#000') + FOOTER,
   MONSTER_GHOST: HEADER + r(2,2,12,12,'#fff') + r(4,4,2,2,'#000') + r(10,4,2,2,'#000') + r(2,14,12,2,'#000') + FOOTER,

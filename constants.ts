@@ -1,14 +1,18 @@
+import React from 'react';
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
+import { Dumbbell, Wind, Heart, BookOpen, Brain, Crown } from 'lucide-react';
+
 export { ASSETS };
 
-export const STAT_ICONS: Record<StatType, string> = {
-    [StatType.MUSCLE]: ASSETS.ICON_MUSCLE,
-    [StatType.AGILITY]: ASSETS.ICON_AGILITY,
-    [StatType.FORTITUDE]: ASSETS.ICON_FORTITUDE,
-    [StatType.KNOWLEDGE]: ASSETS.ICON_KNOWLEDGE,
-    [StatType.SMARTS]: ASSETS.ICON_SMARTS,
-    [StatType.LOOKS]: ASSETS.ICON_LOOKS,
+// Using Lucide Icons for Stats
+export const STAT_ICONS: Record<StatType, React.ElementType> = {
+    [StatType.MUSCLE]: Dumbbell,
+    [StatType.AGILITY]: Wind,
+    [StatType.FORTITUDE]: Heart,
+    [StatType.KNOWLEDGE]: BookOpen,
+    [StatType.SMARTS]: Brain,
+    [StatType.LOOKS]: Crown,
 };
 
 export const GAME_DURATION = 600; // 10 minutes in seconds

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useRef } from 'react';
 import { GameState, Player, Room, Die, StatType, RoomObstacle, HeroClass } from '../types';
 import { Room3D } from './Room3D';
@@ -493,11 +494,11 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
           </div>
       )}
 
-      {/* Control Panel - REVISED LAYOUT */}
-      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4 overflow-hidden">
+      {/* Control Panel - REVISED LAYOUT for Mobile Fixed Height */}
+      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto md:overflow-hidden">
         
-        {/* Left: Stats & Dice & Inventory - Prioritized on Mobile */}
-        <div className="bg-slate-900 border-4 border-double border-slate-600 p-4 relative shadow-lg flex flex-col overflow-hidden shrink-0 md:w-1/2 md:shrink h-auto md:h-full">
+        {/* Left: Stats & Dice & Inventory - Prioritized on Mobile with Fixed Height */}
+        <div className="bg-slate-900 border-4 double border-slate-600 p-4 relative shadow-lg flex flex-col overflow-hidden shrink-0 h-[340px] md:h-full md:w-1/2">
             
             {/* Tabs */}
             <div className="flex gap-1 absolute -top-4 left-4">
@@ -549,7 +550,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                             
                                             {isLocked && <Lock className="w-6 h-6 text-slate-400 absolute z-10" />}
                                             <div className={`w-8 h-8 rounded-full ${STAT_BG_COLORS[die.currentValue]} flex items-center justify-center overflow-hidden border border-black/20`}>
-                                                <img src={STAT_ICONS[die.currentValue]} className="w-3/4 h-3/4 opacity-60 [image-rendering:pixelated]" />
+                                                {React.createElement(STAT_ICONS[die.currentValue], { className: "w-3/4 h-3/4 opacity-60" })}
                                             </div>
                                             {multiplier > 1 && (
                                                 <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border border-white">
@@ -598,7 +599,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                                     `}
                                                  >
                                                     <div className={`w-5 h-5 rounded-full ${STAT_BG_COLORS[face]} flex items-center justify-center overflow-hidden`}>
-                                                        <img src={STAT_ICONS[face]} className="w-3/4 h-3/4 opacity-50 [image-rendering:pixelated]" />
+                                                        {React.createElement(STAT_ICONS[face], { className: "w-3/4 h-3/4 opacity-50" })}
                                                     </div>
                                                     <div className="text-[6px] uppercase text-center w-full truncate">{face}</div>
                                                     {mult > 1 && <span className="absolute top-0 right-0 text-[8px] font-bold bg-yellow-500 text-black px-1 rounded-sm">x{mult}</span>}
@@ -721,7 +722,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         </div>
 
         {/* Center: Interaction / Log */}
-        <Panel className="flex flex-col relative flex-1 min-h-0">
+        <Panel className="flex flex-col relative shrink-0 min-h-[200px] md:flex-1 md:h-full md:min-h-0">
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 mb-2">
                 {combatLog.length === 0 && <div className="text-slate-600 italic">It is quiet... too quiet.</div>}
                 {combatLog.map((log, i) => (
