@@ -1,8 +1,15 @@
-
-
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
 export { ASSETS };
+
+export const STAT_ICONS: Record<StatType, string> = {
+    [StatType.MUSCLE]: ASSETS.ICON_MUSCLE,
+    [StatType.AGILITY]: ASSETS.ICON_AGILITY,
+    [StatType.FORTITUDE]: ASSETS.ICON_FORTITUDE,
+    [StatType.KNOWLEDGE]: ASSETS.ICON_KNOWLEDGE,
+    [StatType.SMARTS]: ASSETS.ICON_SMARTS,
+    [StatType.LOOKS]: ASSETS.ICON_LOOKS,
+};
 
 export const GAME_DURATION = 600; // 10 minutes in seconds
 export const PREGAME_DURATION = 180; // 3 minutes

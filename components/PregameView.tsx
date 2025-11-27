@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { GameState, Player, PlayerRole, StatType, Die, ObstacleCard } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
-import { STAT_COLORS, STAT_BG_COLORS, ASSETS } from '../constants';
+import { STAT_COLORS, STAT_BG_COLORS, STAT_ICONS } from '../constants';
 import { Shield, Zap, Book, Cross, Axe, Music, Check, Star, Sword, Ban, RefreshCw, Gift } from 'lucide-react';
 
 interface PregameProps {
@@ -92,24 +92,26 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                   <div key={die.id}
                                        onClick={() => setSelectedIndex(idx)}
                                        className={`
-                                            bg-slate-800 border-2 p-4 cursor-pointer transition-all flex flex-col items-center gap-4 group
+                                            bg-slate-800 border-2 p-2 cursor-pointer transition-all flex flex-col items-center gap-2 group
                                             ${selectedIndex === idx ? 'border-yellow-400 ring-2 ring-yellow-400/50' : 'border-slate-600 hover:border-yellow-400 hover:bg-slate-700'}
                                        `}>
                                        
-                                       <div className={`w-16 h-16 rounded-xl border-4 flex items-center justify-center bg-slate-900 ${STAT_COLORS[die.faces[0]]}`}>
-                                            <div className={`w-8 h-8 rounded-full ${STAT_BG_COLORS[die.faces[0]]}`}></div>
-                                       </div>
-                                       
-                                       <div className="w-full grid grid-cols-3 gap-1">
+                                       <div className="w-full grid grid-cols-3 gap-2">
                                             {die.faces.map((f, i) => (
-                                                <div key={i} className={`h-6 rounded border flex items-center justify-center relative ${STAT_BG_COLORS[f]}`}>
-                                                    {die.multipliers[i] > 1 && (
-                                                        <Star className="w-3 h-3 text-yellow-300 fill-yellow-300 drop-shadow-md" />
-                                                    )}
+                                                <div key={i} className="flex flex-col items-center gap-1">
+                                                    <div className={`w-full aspect-square rounded border flex items-center justify-center relative ${STAT_BG_COLORS[f]}`}>
+                                                        <img src={STAT_ICONS[f]} className="w-2/3 h-2/3 opacity-50 [image-rendering:pixelated]" />
+                                                        {die.multipliers[i] > 1 && (
+                                                            <div className="absolute -top-1 -right-1 text-[10px] bg-yellow-300 text-black font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-white">
+                                                                x{die.multipliers[i]}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[6px] uppercase text-slate-400 font-bold tracking-tighter">{f}</span>
                                                 </div>
                                             ))}
                                        </div>
-                                       <div className="text-xs text-slate-400 font-mono">
+                                       <div className="text-xs text-slate-400 font-mono mt-2">
                                            {die.multipliers.filter(m => m > 1).length > 0 ? 'Contains Multipliers!' : 'Standard Die'}
                                        </div>
                                   </div>

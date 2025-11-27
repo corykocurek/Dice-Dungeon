@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { GameState, Player, Room, Die, StatType, RoomObstacle, HeroClass } from '../types';
 import { Room3D } from './Room3D';
 import { RetroButton, Panel, ProgressBar } from './RetroComponents';
-import { STAT_COLORS, STAT_BG_COLORS, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, MAP_SIZE, ITEM_REGISTRY } from '../constants';
+import { STAT_COLORS, STAT_BG_COLORS, STAT_ICONS, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, MAP_SIZE, ITEM_REGISTRY } from '../constants';
 import { Dices, Activity, Map as MapIcon, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Ban, RefreshCw, Zap, Lock, Unlock, Undo2, X, Sword, SquareStack, Star, Key, Backpack, Grid3X3, ChevronDown, ChevronUp, Trash2, Info, Sparkles, CheckCircle, DoorOpen, Shield, Book, Cross, Axe, Music, User } from 'lucide-react';
 
 interface HeroProps {
@@ -331,7 +331,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
             </div>
         </div>
 
-        {/* Success Popup (Centered using absolute inside relative container) */}
+        {/* Success Popup (Centered) */}
         {successMsg && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] animate-bounce-slow pointer-events-none w-[90%] max-w-sm">
                  <div className="bg-green-900/90 border-2 border-green-500 p-4 rounded-xl shadow-2xl flex items-center gap-2 justify-center backdrop-blur-md">
@@ -493,11 +493,11 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
           </div>
       )}
 
-      {/* Control Panel */}
-      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-hidden">
+      {/* Control Panel - REVISED LAYOUT */}
+      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4 overflow-hidden">
         
-        {/* Left: Stats & Dice & Inventory */}
-        <div className="bg-slate-900 border-4 border-double border-slate-600 p-4 relative shadow-lg min-h-0 flex flex-col overflow-hidden">
+        {/* Left: Stats & Dice & Inventory - Prioritized on Mobile */}
+        <div className="bg-slate-900 border-4 border-double border-slate-600 p-4 relative shadow-lg flex flex-col overflow-hidden shrink-0 md:w-1/2 md:shrink h-auto md:h-full">
             
             {/* Tabs */}
             <div className="flex gap-1 absolute -top-4 left-4">
@@ -526,10 +526,10 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
             {/* Tab Content: DICE */}
             {activeTab === 'DICE' && (
-                <div className="flex flex-col flex-1 pt-2 min-h-0">
+                <div className="flex flex-col pt-2 min-h-0 flex-1">
                     {/* Sub-mode: ROLL View */}
                     {diceMode === 'ROLL' && (
-                        <div className="flex flex-row overflow-x-auto gap-2 flex-1 w-full pb-2 items-start">
+                        <div className="flex flex-row overflow-x-auto gap-2 pb-2 items-start min-h-[100px]">
                             {player.dicePool.map((die, idx) => {
                                 const isLocked = !!die.lockedToObstacleId;
                                 // Effective if obstacle has this req
@@ -543,14 +543,16 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                         ${isLocked ? 'bg-slate-900 border-slate-700 opacity-75' : 'bg-slate-800 border-slate-600'}
                                         ${isEffective ? 'border-yellow-400 bg-slate-750' : ''}
                                     `}>
-                                        <div className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center relative 
+                                        <div className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center relative 
                                             ${isLocked ? 'bg-slate-800 border-slate-600 grayscale' : STAT_COLORS[die.currentValue]} 
                                             ${isAnimating ? 'animate-tumble' : ''}`}>
                                             
-                                            {isLocked && <Lock className="w-5 h-5 text-slate-400 absolute z-10" />}
-                                            <div className={`w-6 h-6 rounded-full ${STAT_BG_COLORS[die.currentValue]}`}></div>
+                                            {isLocked && <Lock className="w-6 h-6 text-slate-400 absolute z-10" />}
+                                            <div className={`w-8 h-8 rounded-full ${STAT_BG_COLORS[die.currentValue]} flex items-center justify-center overflow-hidden border border-black/20`}>
+                                                <img src={STAT_ICONS[die.currentValue]} className="w-3/4 h-3/4 opacity-60 [image-rendering:pixelated]" />
+                                            </div>
                                             {multiplier > 1 && (
-                                                <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border border-white">
+                                                <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border border-white">
                                                     x{multiplier}
                                                 </div>
                                             )}
@@ -575,7 +577,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
                     {/* Sub-mode: SIDES View */}
                     {diceMode === 'SIDES' && (
-                        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
                             {player.dicePool.map((die, dieIdx) => (
                                 <div key={die.id} className="bg-slate-950 p-2 border border-slate-700">
                                      <div className="text-[10px] text-slate-500 mb-1">DICE {dieIdx + 1}</div>
@@ -589,13 +591,15 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                                     disabled={!canUpgrade}
                                                     onClick={() => onUpgrade(dieIdx, faceIdx)}
                                                     className={`
-                                                        relative h-12 border rounded flex flex-col items-center justify-center gap-1
+                                                        relative h-14 border rounded flex flex-col items-center justify-center gap-1
                                                         ${STAT_COLORS[face]}
                                                         ${canUpgrade ? 'hover:bg-slate-800 cursor-pointer ring-2 ring-yellow-400' : 'cursor-default opacity-80'}
                                                         bg-slate-900
                                                     `}
                                                  >
-                                                    <div className={`w-3 h-3 rounded-full ${STAT_BG_COLORS[face]}`}></div>
+                                                    <div className={`w-5 h-5 rounded-full ${STAT_BG_COLORS[face]} flex items-center justify-center overflow-hidden`}>
+                                                        <img src={STAT_ICONS[face]} className="w-3/4 h-3/4 opacity-50 [image-rendering:pixelated]" />
+                                                    </div>
                                                     <div className="text-[6px] uppercase text-center w-full truncate">{face}</div>
                                                     {mult > 1 && <span className="absolute top-0 right-0 text-[8px] font-bold bg-yellow-500 text-black px-1 rounded-sm">x{mult}</span>}
                                                     {canUpgrade && <div className="absolute inset-0 bg-yellow-500/10 flex items-center justify-center animate-pulse">
@@ -717,7 +721,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         </div>
 
         {/* Center: Interaction / Log */}
-        <Panel className="flex flex-col relative min-h-0 md:min-h-0">
+        <Panel className="flex flex-col relative flex-1 min-h-0">
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 mb-2">
                 {combatLog.length === 0 && <div className="text-slate-600 italic">It is quiet... too quiet.</div>}
                 {combatLog.map((log, i) => (

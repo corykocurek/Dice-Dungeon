@@ -151,18 +151,12 @@ export default function App() {
     peer.on('error', (err: any) => {
         console.error("PeerJS Error:", err);
         
-        // Auto-reconnect on network/server errors
+        // Ignore lost connection errors to allow auto-reconnect logic to work without blocking UI
         if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'disconnected' || (err.message && err.message.includes('Lost connection'))) {
-             // Only show reconnecting state if we aren't already playing (to avoid UI flicker during play if P2P is fine)
-             // However, for now, let's just try to reconnect without changing state if connected, 
-             // or change to RECONNECTING if we were initializing.
-             if (peerStatus !== 'CONNECTED') {
-                 setPeerStatus('RECONNECTING');
-             }
-             
-             if (peer && !peer.destroyed) {
-                 setTimeout(() => peer.reconnect(), 1000);
-             }
+             console.warn("Connection lost, attempting auto-reconnect in background...");
+             // Do not set ERROR status here, let auto-reconnect happen
+             // Only set RECONNECTING if we are stuck for a while? 
+             // Actually, keeping UI interactive is better.
              return;
         }
 
@@ -179,9 +173,7 @@ export default function App() {
 
     peer.on('disconnected', () => {
         console.log("Peer disconnected from server. Attempting reconnect...");
-        if (peerStatus !== 'CONNECTED') {
-             setPeerStatus('RECONNECTING');
-        }
+        // Do not show full screen error, just try to reconnect
         if (peer && !peer.destroyed) {
             setTimeout(() => {
                  if (peer && !peer.destroyed) peer.reconnect();
@@ -257,6 +249,7 @@ export default function App() {
         conn.on('error', (err: any) => {
             clearTimeout(timeout);
             console.error("Connection error:", err);
+            // Suppress alert for non-critical join errors if we want, but usually join error is critical.
             alert(`Could not connect to host: ${err.type || 'Unknown Error'}`);
         });
         
