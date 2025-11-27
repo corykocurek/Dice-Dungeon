@@ -1,6 +1,6 @@
 
 import { Room, ObstacleCard, StatType, RoomObstacle, Die } from '../types';
-import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DURATION, CORE_STATS } from '../constants';
+import { OBSTACLE_DECK, MAP_SIZE, RED_KEY_ID, RED_DOOR_CARD, LOOT_TABLE, GAME_DURATION, CORE_STATS, MANA_GENERATOR_CARD } from '../constants';
 
 const getFilteredDeck = (gameTimer?: number): Omit<ObstacleCard, 'id'>[] => {
     if (gameTimer === undefined) return OBSTACLE_DECK; 
@@ -67,6 +67,20 @@ export const generateDraftDie = (id: string, draftStep: number): Die => {
     
     const currentValue = faces[0];
     return { id, faces, multipliers, currentValue, lockedToObstacleId: null, lastInteractionTime: Date.now() };
+};
+
+export const generateDraftItems = (): string[] => {
+    // Pick 3 random items from LOOT_TABLE, excluding RED_KEY if it were in there (it's not, but safe check)
+    const options: string[] = [];
+    const pool = [...LOOT_TABLE];
+    
+    for (let i = 0; i < 3; i++) {
+        if (pool.length === 0) break;
+        const idx = Math.floor(Math.random() * pool.length);
+        options.push(pool[idx]);
+        pool.splice(idx, 1);
+    }
+    return options;
 };
 
 export const generateDraftCards = (tier: 'BASIC' | 'NEUTRAL' | 'ADVANCED', count: number): ObstacleCard[] => {
@@ -256,6 +270,33 @@ export const generateMap = (): Record<string, Room> => {
       };
       map[doorRoomId].activeObstacles.push(redDoor);
   }
+
+  // --- MANA GENERATOR PLACEMENT (Guarantee 3) ---
+  const validManaGenRooms = allIds.filter(id => 
+      id !== startId && 
+      id !== exitId && 
+      map[id].activeObstacles.length === 0
+  );
+  
+  // Shuffle valid rooms
+  for (let i = validManaGenRooms.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [validManaGenRooms[i], validManaGenRooms[j]] = [validManaGenRooms[j], validManaGenRooms[i]];
+  }
+
+  // Take up to 3
+  const manaGenRooms = validManaGenRooms.slice(0, 3);
+  
+  manaGenRooms.forEach(id => {
+      const manaGen: RoomObstacle = {
+          id: `obs-mana-gen-${id}`,
+          card: { ...MANA_GENERATOR_CARD, id: `card-mana-gen-${id}` },
+          currentSuccesses: {},
+          permanentSuccesses: {},
+          isDefeated: false
+      };
+      map[id].activeObstacles.push(manaGen);
+  });
 
   return map;
 };

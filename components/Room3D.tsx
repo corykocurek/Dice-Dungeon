@@ -50,9 +50,30 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
   const hasWest = room.connections.includes(`${cx-1},${cy}`);
 
   // Calculate Player Positions
+  // We need to know total players in this room to assign corners if encounter exists
+  const playersInRoom = allPlayers.filter(p => p.currentRoomId === room.id);
+  
   const renderPlayers = allPlayers.map(p => {
       // 1. Player is IN this room (ENTERING or STANDING)
       if (p.currentRoomId === room.id) {
+          // Determine standing position
+          let standX = 50;
+          let standY = 50;
+          
+          if (obstacles.length > 0) {
+              // ENCOUNTER MODE: Stand in corners based on index
+              const index = playersInRoom.findIndex(pl => pl.id === p.id);
+              if (index === 0) { standX = 20; standY = 20; }
+              else if (index === 1) { standX = 80; standY = 20; }
+              else if (index === 2) { standX = 20; standY = 80; }
+              else { standX = 80; standY = 80; }
+          } else {
+              // EXPLORE MODE: Center jitter
+              const offset = (parseInt(p.id.slice(-2), 16) % 20) - 10; 
+              standX = 50 + offset;
+              standY = 50 + offset;
+          }
+
           if (p.isMoving) {
               // ENTERING Phase (Second half of movement)
               if (!p.previousRoomId) return null; 
@@ -74,14 +95,13 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
               else if (prev.x < cx) { startX = -20; } // From West
               else if (prev.x > cx) { startX = 120; } // From East
 
-              const currentX = startX + (50 - startX) * enterProgress;
-              const currentY = startY + (50 - startY) * enterProgress;
+              const currentX = startX + (standX - startX) * enterProgress;
+              const currentY = startY + (standY - startY) * enterProgress;
 
               return { ...p, x: currentX, y: currentY, opacity: 1 };
           } else {
-              // Standing in room (Jitter slightly based on ID hash to prevent stacking)
-              const offset = (parseInt(p.id.slice(-2), 16) % 20) - 10; 
-              return { ...p, x: 50 + offset, y: 50 + offset, opacity: 1 };
+              // Standing in designated spot
+              return { ...p, x: standX, y: standY, opacity: 1 };
           }
       }
       

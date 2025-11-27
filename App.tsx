@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, PlayerRole, HeroClass, RoomObstacle, StatType, NetworkMessage, GameAction, Room, Die } from './types';
-import { generateMap, drawCard, rollDie, getRandomLoot, generateDraftDie, generateDraftCards, generateStarterDice, createCardInstance } from './utils/gameLogic';
+import { generateMap, drawCard, rollDie, getRandomLoot, generateDraftDie, generateDraftCards, generateStarterDice, createCardInstance, generateDraftItems } from './utils/gameLogic';
 import { GAME_DURATION, PREGAME_DURATION, RESOURCE_TICK_INTERVAL, CARD_DRAW_INTERVAL, MOVEMENT_DELAY, CLASS_BONUS, REROLL_COOLDOWN, RED_KEY_ID, ITEM_REGISTRY, SUPERCHARGE_COOLDOWN, SUPERCHARGE_DURATION, OBSTACLE_DECK } from './constants';
 import { Lobby } from './components/Lobby';
 import { DungeonMasterView } from './components/DungeonMasterView';
@@ -23,6 +23,7 @@ const INITIAL_STATE: GameState = {
   lastResourceTick: Date.now(),
   lastCardDrawTick: Date.now(),
   lastSuperChargeTime: 0,
+  lastTimerTick: Date.now(),
 };
 
 export default function App() {
@@ -51,7 +52,11 @@ export default function App() {
         const now = Date.now();
         const newState: GameState = JSON.parse(JSON.stringify(prev));
 
-        newState.timer = prev.timer - 1;
+        // Fix: Only decrement timer once per second
+        if (now - prev.lastTimerTick >= 1000) {
+            newState.timer = prev.timer - 1;
+            newState.lastTimerTick = now;
+        }
 
         if (newState.status === 'PREGAME') {
             if (newState.timer <= 0) {
@@ -110,7 +115,22 @@ export default function App() {
             return newState;
         }
 
-        if (now - prev.lastResourceTick > RESOURCE_TICK_INTERVAL) {
+        // --- Mana Generation Logic ---
+        // Calculate Mana Gen Speed: Base + 10% per active generator
+        let activeGenerators = 0;
+        Object.values(newState.map as Record<string, Room>).forEach(room => {
+            room.activeObstacles.forEach(obs => {
+                if (!obs.isDefeated && obs.card.specialRules?.manaGeneration) {
+                    activeGenerators++;
+                }
+            });
+        });
+        
+        // Effective interval gets smaller (faster) as multiplier increases
+        const speedMultiplier = 1 + (activeGenerators * 0.10);
+        const effectiveInterval = RESOURCE_TICK_INTERVAL / speedMultiplier;
+
+        if (now - prev.lastResourceTick > effectiveInterval) {
             newState.dmResources = Math.min(10, newState.dmResources + 1);
             newState.lastResourceTick = now;
         }
@@ -137,7 +157,8 @@ export default function App() {
                 // If die is GOLD or EXP, check how long it has been sitting there
                 if (die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP) {
                     const timeOnFace = now - (die.lastInteractionTime || 0);
-                    if (timeOnFace > 1500) { // 1.5 seconds delay for visual feedback
+                    // Updated to 0.8 seconds (800ms) as requested
+                    if (timeOnFace > 800) { 
                         // Process Resource
                         if (die.currentValue === StatType.GOLD) {
                             p.gold = (p.gold || 0) + 1;
@@ -185,7 +206,7 @@ export default function App() {
         broadcastState(newState);
         return newState;
     });
-    }, 100); // Increased tick rate slightly for smoother checking
+    }, 100); // 100ms update rate for UI responsiveness and auto-roll checks
 
     return () => clearInterval(interval);
   }, [gameState.status, isHost]);
@@ -288,6 +309,8 @@ export default function App() {
                  obstaclesDefeatedCount: 0,
                  draftStep: 0,
                  draftDieOptions: [],
+                 draftItemOptions: [],
+                 hasDraftedItem: false,
                  isReady: false,
                  gold: 0,
                  exp: 0,
@@ -329,7 +352,13 @@ export default function App() {
 
   const broadcastState = (state: GameState) => {
     connectionsRef.current.forEach(conn => {
-        if (conn.open) conn.send({ type: 'SYNC_STATE', payload: state });
+        if (conn.open) {
+            try {
+                conn.send({ type: 'SYNC_STATE', payload: state });
+            } catch (e) {
+                console.warn("Failed to broadcast state to peer", conn.peer, e);
+            }
+        }
     });
   };
 
@@ -349,6 +378,7 @@ export default function App() {
                 playerToAdd.inventory = ['ITEM_SCROLL']; 
                 // Set interaction time for new dice
                 playerToAdd.dicePool.forEach(d => d.lastInteractionTime = Date.now());
+                playerToAdd.hasDraftedItem = true; // Skip draft for late joiners
             }
         }
 
@@ -470,8 +500,10 @@ export default function App() {
                   p.dicePool = generateStarterDice(); // 1 balanced die
                   p.inventory = ['ITEM_SCROLL']; 
                   p.draftStep = 0;
+                  p.hasDraftedItem = false;
                   p.dicePool.forEach(d => d.lastInteractionTime = now);
                   
+                  p.draftItemOptions = generateDraftItems();
                   p.draftDieOptions = [
                       generateDraftDie('draft-1', 0),
                       generateDraftDie('draft-2', 0),
@@ -480,9 +512,27 @@ export default function App() {
               }
           });
       }
+      else if (action.type === 'DRAFT_ITEM') {
+          const player = draft.players.find(p => p.id === action.playerId);
+          if (player && player.role === PlayerRole.HERO && !player.hasDraftedItem) {
+              const selectedItem = player.draftItemOptions[action.itemIndex];
+              if (selectedItem) {
+                  player.inventory.push(selectedItem);
+                  player.hasDraftedItem = true;
+                  player.draftItemOptions = [];
+                  
+                  // Check extra die grant
+                  const def = ITEM_REGISTRY[selectedItem];
+                  if (def?.grantsExtraDie) {
+                      player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0));
+                      player.dicePool[player.dicePool.length-1].lastInteractionTime = now;
+                  }
+              }
+          }
+      }
       else if (action.type === 'DRAFT_DIE') {
           const player = draft.players.find(p => p.id === action.playerId);
-          if (player && player.role === PlayerRole.HERO && !player.isReady) {
+          if (player && player.role === PlayerRole.HERO && !player.isReady && player.hasDraftedItem) {
                const selectedDie = player.draftDieOptions[action.dieIndex];
                if (selectedDie) {
                    const newDie = { ...selectedDie, id: `die-${player.id}-${player.draftStep}-${now}`, lastInteractionTime: now };
@@ -556,6 +606,8 @@ export default function App() {
               p.gold = 0;
               p.exp = 0;
               p.level = 1;
+              p.hasDraftedItem = false;
+              p.draftItemOptions = [];
           });
       }
       else if (action.type === 'SUPER_CHARGE_ROOM') {
@@ -651,7 +703,8 @@ export default function App() {
           const player = draft.players.find(p => p.id === action.playerId);
           if (player && now - player.lastRerollTime >= REROLL_COOLDOWN) {
               player.dicePool.forEach(die => {
-                  if (!die.lockedToObstacleId) {
+                  // Only reroll if not locked AND not currently a Gold/Exp side (as those auto-roll)
+                  if (!die.lockedToObstacleId && die.currentValue !== StatType.GOLD && die.currentValue !== StatType.EXP) {
                       die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
                       die.lastInteractionTime = now;
                   }
@@ -817,7 +870,7 @@ export default function App() {
         id: peerId!, name, role: PlayerRole.HERO, heroClass: HeroClass.FIGHTER, currentRoomId: '0,0',
         previousRoomId: null, visitedRooms: ['0,0'], dicePool: [], inventory: [], isMoving: false,
         moveUnlockTime: 0, lastRerollTime: 0, upgradePoints: 0, obstaclesDefeatedCount: 0,
-        draftStep: 0, draftDieOptions: [], isReady: false, gold: 0, exp: 0, level: 1
+        draftStep: 0, draftDieOptions: [], draftItemOptions: [], hasDraftedItem: false, isReady: false, gold: 0, exp: 0, level: 1
     };
     setGameState(prev => ({
         ...prev, players: [hostPlayer], localPlayerId: peerId!
@@ -897,6 +950,7 @@ export default function App() {
              gameState={gameState}
              localPlayer={gameState.players.find(p => p.id === gameState.localPlayerId)!}
              onDraftDie={(idx) => dispatchAction({ type: 'DRAFT_DIE', playerId: gameState.localPlayerId!, dieIndex: idx })}
+             onDraftItem={(idx) => dispatchAction({ type: 'DRAFT_ITEM', playerId: gameState.localPlayerId!, itemIndex: idx })}
              onDraftCard={(idx) => dispatchAction({ type: 'DRAFT_CARD', cardIndex: idx })}
              onReady={() => dispatchAction({ type: 'PLAYER_READY', playerId: gameState.localPlayerId! })}
           />

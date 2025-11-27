@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HeroClass, PlayerRole, Player, StatType } from '../types';
 import { RetroButton, Panel } from './RetroComponents';
 import { Shield, Zap, Book, Cross, Users, Copy, Radio, ArrowRight, Library, Search, ChevronLeft, Axe, Music, Brain, HelpCircle, Coins, Star, Swords, Skull, Map } from 'lucide-react';
@@ -31,6 +31,9 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [joinCode, setJoinCode] = useState('');
   const [name, setName] = useState('');
   
+  // Start Game Countdown
+  const [startCountdown, setStartCountdown] = useState<number | null>(null);
+  
   // Archives State
   const [archiveTab, setArchiveTab] = useState<'ITEMS' | 'OBSTACLES'>('ITEMS');
   
@@ -57,6 +60,19 @@ export const Lobby: React.FC<LobbyProps> = ({
       }
     }
   }, [localPlayerId, players]);
+
+  // Countdown Logic
+  useEffect(() => {
+      if (startCountdown === null) return;
+      
+      if (startCountdown > 0) {
+          const timer = setTimeout(() => setStartCountdown(startCountdown - 1), 1000);
+          return () => clearTimeout(timer);
+      } else {
+          onStartGame();
+          setStartCountdown(null);
+      }
+  }, [startCountdown]);
 
   const heroClasses = [
     { type: HeroClass.FIGHTER, icon: Shield, bonus: "x2 Muscle" },
@@ -655,13 +671,22 @@ export const Lobby: React.FC<LobbyProps> = ({
 
           {isHost && (
             <div className="mt-4 pt-4 border-t border-slate-700">
-               <RetroButton 
-                  className="w-full py-4 text-xl animate-pulse" 
-                  onClick={onStartGame}
-                  disabled={players.length < 1} // Allow 1 for testing, ideally 2+
-               >
-                 START GAME
-               </RetroButton>
+               {startCountdown !== null ? (
+                   <RetroButton 
+                        className="w-full py-4 text-xl animate-pulse bg-red-900 border-red-500" 
+                        onClick={() => setStartCountdown(null)}
+                   >
+                       CANCEL START ({startCountdown})
+                   </RetroButton>
+               ) : (
+                   <RetroButton 
+                      className="w-full py-4 text-xl" 
+                      onClick={() => setStartCountdown(5)}
+                      disabled={players.length < 1}
+                   >
+                     START GAME
+                   </RetroButton>
+               )}
             </div>
           )}
           {!isHost && (

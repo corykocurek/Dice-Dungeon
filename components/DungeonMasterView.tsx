@@ -42,7 +42,20 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
           const now = Date.now();
           setCurrentTime(now);
           const elapsed = now - currentState.lastResourceTick;
-          const fraction = Math.min(1, Math.max(0, elapsed / RESOURCE_TICK_INTERVAL));
+          
+          // Calculate speed based on active generators
+          let activeGenerators = 0;
+          Object.values(currentState.map as Record<string, Room>).forEach(room => {
+              room.activeObstacles.forEach(obs => {
+                  if (!obs.isDefeated && obs.card.specialRules?.manaGeneration) {
+                      activeGenerators++;
+                  }
+              });
+          });
+          const speedMultiplier = 1 + (activeGenerators * 0.10);
+          const effectiveInterval = RESOURCE_TICK_INTERVAL / speedMultiplier;
+
+          const fraction = Math.min(1, Math.max(0, elapsed / effectiveInterval));
           
           const currentResources = currentState.dmResources;
           
@@ -115,6 +128,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                         const hasRedDoor = room.activeObstacles.some(o => o.card.keyRequirement === RED_KEY_ID);
                         const isSupercharged = room.superChargeUnlockTime > currentTime;
                         const recentActivity = room.recentSuccesses && room.recentSuccesses.length > 0;
+                        const isManaGen = room.activeObstacles.some(o => o.card.specialRules?.manaGeneration && !o.isDefeated);
                         
                         const x = room.x;
                         const y = room.y;
@@ -159,6 +173,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                     ${hasTraps && !isBlocked ? 'border border-red-500' : ''}
                                     ${isSelected ? 'ring-2 ring-yellow-400' : ''}
                                     ${isSupercharged ? 'ring-2 ring-purple-500 animate-pulse' : ''}
+                                    ${isManaGen && !isSelected ? 'ring-2 ring-cyan-400 shadow-[0_0_10px_#0ff]' : ''}
                                 `}>
                                     {room.isStart && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-green-300">START</span>}
                                     {room.isExit && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-yellow-300">EXIT</span>}
@@ -287,6 +302,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                             {obs.card.specialRules.preventsRetreat && <div className="flex items-center gap-0.5 bg-red-900/50 px-1.5 py-0.5 rounded border border-red-700 text-[9px] text-red-200 font-bold"><Ban className="w-3 h-3" /> NO ESCAPE</div>}
                                             {obs.card.specialRules.resetsOnLeave && <div className="flex items-center gap-0.5 bg-purple-900/50 px-1.5 py-0.5 rounded border border-purple-700 text-[9px] text-purple-200 font-bold"><RefreshCw className="w-3 h-3" /> REGEN</div>}
                                             {obs.card.specialRules.reward && <div className="flex items-center gap-0.5 bg-green-900/50 px-1.5 py-0.5 rounded border border-green-700 text-[9px] text-green-200 font-bold"><Gift className="w-3 h-3" /> LOOT</div>}
+                                            {obs.card.specialRules.manaGeneration && <div className="flex items-center gap-0.5 bg-cyan-900/50 px-1.5 py-0.5 rounded border border-cyan-700 text-[9px] text-cyan-200 font-bold"><Zap className="w-3 h-3" /> MANA</div>}
                                         </div>
                                     )}
                                 </div>

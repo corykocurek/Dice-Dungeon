@@ -51,6 +51,8 @@ export interface ObstacleCard {
         resetsOnLeave?: boolean;
         accumulatesDamage?: boolean;
         reward?: 'LOOT_DROP';
+        passable?: boolean;
+        manaGeneration?: boolean;
     };
 }
 
@@ -101,6 +103,8 @@ export interface Player {
     obstaclesDefeatedCount: number;
     draftStep: number;
     draftDieOptions: Die[];
+    draftItemOptions: string[]; // IDs of items
+    hasDraftedItem: boolean;
     isReady: boolean;
     gold: number;
     exp: number;
@@ -122,6 +126,7 @@ export interface GameState {
   lastResourceTick: number;
   lastCardDrawTick: number;
   lastSuperChargeTime: number; // Timestamp for DM global cooldown
+  lastTimerTick: number; // Timestamp for last second decrement
 }
 
 // Network & Action Types
@@ -149,6 +154,7 @@ export type GameAction =
   | { type: 'UPDATE_PLAYER'; playerId: string; data: Partial<Player> }
   | { type: 'ESCAPE_DUNGEON'; playerId: string }
   | { type: 'RESET_LOBBY' }
-  | { type: 'DRAFT_DIE'; playerId: string; dieIndex: number } // dieIndex refers to index in draftDieOptions
-  | { type: 'DRAFT_CARD'; cardIndex: number } // cardIndex refers to index in dmDraftOptions
+  | { type: 'DRAFT_DIE'; playerId: string; dieIndex: number } 
+  | { type: 'DRAFT_ITEM'; playerId: string; itemIndex: number }
+  | { type: 'DRAFT_CARD'; cardIndex: number } 
   | { type: 'PLAYER_READY'; playerId: string };

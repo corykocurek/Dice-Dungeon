@@ -110,12 +110,14 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   
   const activeObstacles = logicalRoom.activeObstacles.filter(o => !o.isDefeated);
   const activeObstacle = activeObstacles[0]; // Primary target
-  const hasObstacles = activeObstacles.length > 0;
+  
+  // Movement Rules: blocked if obstacles exist AND not passable
+  const hasBlockingObstacles = activeObstacles.length > 0 && activeObstacles.some(o => !o.card.specialRules?.passable);
   
   // Retreat rules
   const preventRetreat = activeObstacles.some(o => o.card.specialRules?.preventsRetreat);
   
-  const canMoveGenerally = !player.isMoving && !hasObstacles;
+  const canMoveGenerally = !player.isMoving && !hasBlockingObstacles;
 
   const handleDieInteraction = (dieIdx: number, isLocked: boolean) => {
       if (diceMode === 'SIDES') return; // No interaction in sides mode
@@ -154,7 +156,12 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
   const handleRerollAll = () => {
       // Animate available dice only
-      const availableIndices = new Set(player.dicePool.map((d, i) => d.lockedToObstacleId ? -1 : i).filter(i => i !== -1));
+      const availableIndices = new Set(player.dicePool.map((d, i) => {
+          // Exclude locked dice AND Gold/Exp dice (since they auto-roll)
+          if (d.lockedToObstacleId || d.currentValue === StatType.GOLD || d.currentValue === StatType.EXP) return -1;
+          return i;
+      }).filter(i => i !== -1));
+      
       setAnimatingDice(availableIndices);
 
       setTimeout(() => {
@@ -175,7 +182,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       
       let btnClass = "bg-slate-700 border-yellow-500 hover:bg-slate-600";
       if (isWall) btnClass = "bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed";
-      else if (isRetreat && hasObstacles && !preventRetreat) btnClass = "bg-blue-800 border-blue-400 hover:bg-blue-700 animate-pulse";
+      else if (isRetreat && hasBlockingObstacles && !preventRetreat) btnClass = "bg-blue-800 border-blue-400 hover:bg-blue-700 animate-pulse";
       else if (!isAllowed) btnClass = "bg-slate-800 border-red-900 opacity-50 cursor-not-allowed";
 
       return (
@@ -187,7 +194,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         >
             {isWall ? <Ban className="w-4 h-4 text-slate-600" /> : 
              (!isAllowed && !isWall) ? <Lock className="w-4 h-4 text-red-500" /> :
-             isRetreat && hasObstacles ? <Undo2 className="w-4 h-4 text-blue-200" /> :
+             isRetreat && hasBlockingObstacles ? <Undo2 className="w-4 h-4 text-blue-200" /> :
              icon}
         </RetroButton>
       );
@@ -290,7 +297,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-slate-900 text-slate-200 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-200">
       
       {/* 3D (Now Top Down) Viewport */}
       <div className="relative h-[40vh] md:flex-1 bg-black shrink-0 perspective-container">
@@ -450,6 +457,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                             <div className="flex gap-2 text-[10px] text-red-300/80">
                                 {activeObstacle.card.specialRules?.preventsRetreat && <span className="flex items-center gap-1"><Ban className="w-3 h-3" /> NO ESCAPE</span>}
                                 {activeObstacle.card.specialRules?.resetsOnLeave && <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3" /> REGENERATES</span>}
+                                {activeObstacle.card.specialRules?.passable && <span className="flex items-center gap-1 text-green-300"><ArrowRight className="w-3 h-3" /> PASSABLE</span>}
                             </div>
                         </div>
                   </div>
@@ -483,7 +491,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       )}
 
       {/* Control Panel - REVISED LAYOUT for Mobile Fixed Height */}
-      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto md:overflow-hidden">
+      <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4">
         
         {/* Left: Stats & Dice & Inventory - Prioritized on Mobile with Fixed Height */}
         <div className="bg-slate-900 border-4 double border-slate-600 p-4 relative shadow-lg flex flex-col shrink-0 min-h-[300px] md:h-full md:w-1/2 overflow-y-auto">
@@ -521,9 +529,9 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                         <div className="flex flex-row flex-wrap gap-2 pb-2 items-start">
                             {player.dicePool.map((die, idx) => {
                                 const isLocked = !!die.lockedToObstacleId;
-                                // Effective if obstacle has this req
                                 const isSpecial = die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP;
-                                const isEffective = (activeObstacle && (activeObstacle.card.requirements[die.currentValue] || 0) > 0 && !isLocked);
+                                // Effective if obstacle has this req OR it is a Gold/Exp die
+                                const isEffective = (activeObstacle && (activeObstacle.card.requirements[die.currentValue] || 0) > 0 && !isLocked) || isSpecial;
                                 const isAnimating = animatingDice.has(idx);
                                 const faceIndex = die.faces.indexOf(die.currentValue);
                                 const multiplier = die.multipliers[faceIndex] || 1;
@@ -569,7 +577,11 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                     {/* Sub-mode: SIDES View */}
                     {diceMode === 'SIDES' && (
                         <div className="flex-1 space-y-4 pr-1">
-                            {player.dicePool.map((die, dieIdx) => (
+                            {player.dicePool.map((die, dieIdx) => {
+                                // If upgrading, only show the first die
+                                if (isUpgradeMode && dieIdx !== 0) return null;
+
+                                return (
                                 <div key={die.id} className="bg-slate-950 p-2 border border-slate-700">
                                      <div className="text-[10px] text-slate-500 mb-1">DICE {dieIdx + 1}</div>
                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
@@ -602,7 +614,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                          })}
                                      </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     )}
 
@@ -611,7 +623,8 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                             <RetroButton 
                                 className={`flex-1 flex items-center justify-center gap-2 ${rerollCooldownRemaining > 0 ? 'grayscale opacity-50' : ''}`}
                                 onClick={handleRerollAll}
-                                disabled={player.dicePool.every(d => d.lockedToObstacleId) || rerollCooldownRemaining > 0}
+                                // Reroll disabled if all dice are locked OR if all available dice are Gold/Exp (they auto roll)
+                                disabled={player.dicePool.every(d => d.lockedToObstacleId || d.currentValue === StatType.GOLD || d.currentValue === StatType.EXP) || rerollCooldownRemaining > 0}
                             >
                                 <RefreshCw className={`w-4 h-4 ${animatingDice.size > 0 ? 'animate-spin' : ''}`} />
                                 {rerollCooldownRemaining > 0 ? `WAIT ${rerollCooldownRemaining}s` : 'REROLL'}

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { StatType, HeroClass, ObstacleCard, Die, ItemDefinition } from './types';
 import { ASSETS } from './assets';
@@ -132,6 +133,17 @@ export const RED_DOOR_CARD: ObstacleCard = {
     description: "Requires RED KEY",
     keyRequirement: RED_KEY_ID,
     imageUrl: `${ASSETS.DOOR_RED}`,
+    tier: 'NEUTRAL'
+};
+
+export const MANA_GENERATOR_CARD: ObstacleCard = {
+    id: 'special-mana-gen',
+    name: "Mana Generator",
+    cost: 0,
+    requirements: { [StatType.KNOWLEDGE]: 10 },
+    description: "Generates Mana for DM. +10% Speed.",
+    specialRules: { accumulatesDamage: true, passable: true, manaGeneration: true },
+    imageUrl: ASSETS.RUNE_TRAP, 
     tier: 'NEUTRAL'
 };
 
