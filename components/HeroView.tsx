@@ -32,12 +32,29 @@ const CLASS_ICONS: Record<HeroClass, React.ElementType> = {
 };
 
 export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRoll, onUnlock, onReroll, onUpgrade, onPickup, onDrop, onUseItem, onUnlockObstacle, onEscape, onBuyItem }) => {
-  const currentRoom = gameState.map[player.currentRoomId];
   const [combatLog, setCombatLog] = useState<string[]>([]);
   const [animatingDice, setAnimatingDice] = useState<Set<number>>(new Set());
   const [showMap, setShowMap] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  
+  // Animation loop for smooth room switching
+  useEffect(() => {
+      const interval = setInterval(() => setNow(Date.now()), 50);
+      return () => clearInterval(interval);
+  }, []);
+
+  // Determine which room to show during travel
+  const moveRemaining = Math.max(0, player.moveUnlockTime - now);
+  const showPreviousRoom = player.isMoving && player.previousRoomId && moveRemaining > (MOVEMENT_DELAY / 2);
+  
+  // The room object to render in 3D view
+  const displayRoomId = showPreviousRoom ? player.previousRoomId! : player.currentRoomId;
+  const displayRoom = gameState.map[displayRoomId];
+
+  // Current logical room (for UI interactions)
+  const logicalRoom = gameState.map[player.currentRoomId];
   
   // Success Popup State
   const [successMsg, setSuccessMsg] = useState<{name: string, timestamp: number} | null>(null);
@@ -67,9 +84,9 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
   // Track defeated obstacles for Success Popup
   useEffect(() => {
-      if (!currentRoom) return;
+      if (!logicalRoom) return;
       
-      currentRoom.activeObstacles.forEach(obs => {
+      logicalRoom.activeObstacles.forEach(obs => {
           const wasDefeated = prevObstaclesRef.current[obs.id];
           if (!wasDefeated && obs.isDefeated) {
               // Just defeated!
@@ -78,7 +95,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
           }
           prevObstaclesRef.current[obs.id] = obs.isDefeated;
       });
-  }, [currentRoom]);
+  }, [logicalRoom]);
 
   // Reset upgrade mode when switching tabs/modes
   useEffect(() => {
@@ -91,7 +108,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
     return room.connections.includes(targetId) ? targetId : null;
   };
   
-  const activeObstacles = currentRoom.activeObstacles.filter(o => !o.isDefeated);
+  const activeObstacles = logicalRoom.activeObstacles.filter(o => !o.isDefeated);
   const activeObstacle = activeObstacles[0]; // Primary target
   const hasObstacles = activeObstacles.length > 0;
   
@@ -108,23 +125,9 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
           return;
       }
       
-      // Check for Gold/Exp collection (Self-Use)
       const die = player.dicePool[dieIdx];
+      // Gold/Exp are now auto-used in App.tsx, so disable manual interaction if they appear transiently
       if (die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP) {
-          // Dispatch as if hitting an obstacle, but handle special logic in app
-          setAnimatingDice(prev => new Set(prev).add(dieIdx));
-          setTimeout(() => {
-              onRoll('SELF', dieIdx);
-              const msg = die.currentValue === StatType.GOLD ? "Collected Gold!" : "Gained Experience!";
-              setCombatLog(prev => [msg, ...prev.slice(0, 4)]);
-              setTimeout(() => {
-                   setAnimatingDice(prev => {
-                       const next = new Set(prev);
-                       next.delete(dieIdx);
-                       return next;
-                   });
-              }, 500);
-          }, 100);
           return;
       }
       
@@ -164,7 +167,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   };
 
   const renderNavButton = (dx: number, dy: number, icon: React.ReactNode, dir: 'N'|'S'|'E'|'W') => {
-      const roomForNav = (player.isMoving && player.previousRoomId) ? gameState.map[player.previousRoomId] : currentRoom;
+      const roomForNav = (player.isMoving && player.previousRoomId) ? gameState.map[player.previousRoomId] : logicalRoom;
       const target = getNeighbor(dx, dy, roomForNav);
       const isWall = !target;
       const isRetreat = target === player.previousRoomId;
@@ -239,8 +242,8 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   
   // Render Mini-Map: Current room + immediate neighbors
   const renderMiniMap = () => {
-      const cx = currentRoom.x;
-      const cy = currentRoom.y;
+      const cx = logicalRoom.x;
+      const cy = logicalRoom.y;
       
       return (
           <div className="grid grid-cols-3 gap-1 bg-black/60 p-1 border border-slate-600 rounded">
@@ -255,7 +258,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                      if (!isValid) return <div key={nid} className="w-4 h-4 bg-transparent"></div>;
                      
                      // Check connection
-                     const connected = isCenter || currentRoom.connections.includes(nid);
+                     const connected = isCenter || logicalRoom.connections.includes(nid);
                      const roomData = gameState.map[nid];
                      const isVisited = player.visitedRooms.includes(nid);
                      
@@ -293,13 +296,13 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       <div className="relative h-[40vh] md:flex-1 bg-black shrink-0 perspective-container">
         
         <Room3D 
-            room={currentRoom}
+            room={displayRoom}
             allPlayers={gameState.players}
             map={gameState.map}
-            obstacles={activeObstacles} 
-            isExit={currentRoom.isExit}
-            isStart={currentRoom.isStart}
-            items={currentRoom.items}
+            obstacles={displayRoom.id === player.currentRoomId ? activeObstacles : []} 
+            isExit={displayRoom.isExit}
+            isStart={displayRoom.isStart}
+            items={displayRoom.items}
             className="h-full"
         />
         
@@ -356,7 +359,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         {/* HUD - Center: Action Buttons (Pickup/Unlock/Escape) */}
         {!player.isMoving && (
             <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-auto">
-                {currentRoom.isStart && (
+                {logicalRoom.isStart && (
                     <div className="animate-in slide-in-from-bottom">
                         <RetroButton 
                             variant="primary" 
@@ -369,7 +372,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                     </div>
                 )}
 
-                {currentRoom.isExit && activeObstacles.length === 0 && (
+                {logicalRoom.isExit && activeObstacles.length === 0 && (
                     <div className="animate-pulse">
                         <RetroButton 
                             variant="success" 
@@ -382,14 +385,14 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                     </div>
                 )}
 
-                {currentRoom.items.length > 0 && (
+                {logicalRoom.items.length > 0 && (
                     <div className="flex flex-col items-center animate-bounce">
                         <div className="w-8 h-8 mb-1 drop-shadow-[0_0_5px_rgba(255,255,0,1)]">
-                            <img src={ITEM_REGISTRY[currentRoom.items[0]]?.imageUrl} alt="Item" className="w-full h-full [image-rendering:pixelated]" />
+                            <img src={ITEM_REGISTRY[logicalRoom.items[0]]?.imageUrl} alt="Item" className="w-full h-full [image-rendering:pixelated]" />
                         </div>
                         <RetroButton 
                             variant="success" 
-                            onClick={() => onPickup(currentRoom.items[0])}
+                            onClick={() => onPickup(logicalRoom.items[0])}
                             className="shadow-lg text-xs"
                         >
                             PICK UP
@@ -455,7 +458,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                   {!activeObstacle.card.keyRequirement ? (
                       <div className="flex-1 w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           {(Object.entries(activeObstacle.card.requirements) as [StatType, number][]).map(([stat, required]) => {
-                                 const isSupercharged = currentRoom.superChargeUnlockTime > Date.now();
+                                 const isSupercharged = logicalRoom.superChargeUnlockTime > Date.now();
                                  const finalRequired = isSupercharged ? required * 2 : required;
                                  const current = activeObstacle.currentSuccesses[stat] || 0;
                                  return (
@@ -518,9 +521,9 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                         <div className="flex flex-row flex-wrap gap-2 pb-2 items-start">
                             {player.dicePool.map((die, idx) => {
                                 const isLocked = !!die.lockedToObstacleId;
-                                // Effective if obstacle has this req OR is Gold/Exp die (always effective self-use)
+                                // Effective if obstacle has this req
                                 const isSpecial = die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP;
-                                const isEffective = (activeObstacle && (activeObstacle.card.requirements[die.currentValue] || 0) > 0 && !isLocked) || isSpecial;
+                                const isEffective = (activeObstacle && (activeObstacle.card.requirements[die.currentValue] || 0) > 0 && !isLocked);
                                 const isAnimating = animatingDice.has(idx);
                                 const faceIndex = die.faces.indexOf(die.currentValue);
                                 const multiplier = die.multipliers[faceIndex] || 1;
@@ -549,12 +552,13 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                                             className={`w-full text-[10px] py-1 mt-auto px-1 flex justify-center items-center
                                                 ${isLocked ? 'bg-slate-700 border-slate-500 hover:bg-slate-600' : ''}
                                                 ${!isLocked && isEffective ? 'bg-yellow-700 border-yellow-500 text-yellow-100' : ''}
-                                                ${!isLocked && !activeObstacle && !isSpecial ? 'opacity-50 cursor-not-allowed bg-slate-800' : ''}
+                                                ${!isLocked && !activeObstacle ? 'opacity-50 cursor-not-allowed bg-slate-800' : ''}
+                                                ${isSpecial ? 'opacity-50 cursor-not-allowed grayscale' : ''}
                                             `}
-                                            disabled={(!isLocked && !activeObstacle && !isSpecial)}
+                                            disabled={(!isLocked && !activeObstacle) || isSpecial}
                                             onClick={() => handleDieInteraction(idx, isLocked)}
                                         >
-                                            {isLocked ? <Unlock className="w-3 h-3" /> : 'USE'}
+                                            {isLocked ? <Unlock className="w-3 h-3" /> : (isSpecial ? 'AUTO' : 'USE')}
                                         </RetroButton>
                                     </div>
                                 );

@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { RoomObstacle, StatType, Player, Room, HeroClass } from '../types';
-import { Lock, Key, RefreshCw, Link2, Skull, Shield, Zap, Book, Cross, Axe, Music, User } from 'lucide-react';
-import { STAT_BG_COLORS, RED_KEY_ID, ITEM_REGISTRY, MOVEMENT_DELAY } from '../constants';
+import { Lock, RefreshCw, Link2, Shield, Zap, Book, Cross, Axe, Music, User } from 'lucide-react';
+import { STAT_BG_COLORS, ITEM_REGISTRY, MOVEMENT_DELAY } from '../constants';
 
 interface Room3DProps {
   room: Room;
@@ -51,19 +51,21 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
 
   // Calculate Player Positions
   const renderPlayers = allPlayers.map(p => {
-      // 1. Player is IN this room
+      // 1. Player is IN this room (ENTERING or STANDING)
       if (p.currentRoomId === room.id) {
           if (p.isMoving) {
-              // They are ENTERING this room (Logic: current is set instantly, animation catches up)
-              // They come FROM previousRoomId
-              if (!p.previousRoomId) return null; // Should not happen if moving
+              // ENTERING Phase (Second half of movement)
+              if (!p.previousRoomId) return null; 
               const prev = map[p.previousRoomId];
               if (!prev) return null;
 
-              // Progress 0 = At Door/Previous, 1 = Center
               const remaining = Math.max(0, p.moveUnlockTime - now);
-              const progress = 1 - (remaining / MOVEMENT_DELAY);
+              const totalProgress = 1 - (remaining / MOVEMENT_DELAY);
               
+              // Only render entering animation during the second half (0.5 -> 1.0)
+              // Map 0.5-1.0 to 0-1 for visual interpolation
+              const enterProgress = Math.max(0, (totalProgress - 0.5) * 2);
+
               let startX = 50;
               let startY = 50;
               
@@ -72,10 +74,10 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
               else if (prev.x < cx) { startX = -20; } // From West
               else if (prev.x > cx) { startX = 120; } // From East
 
-              const currentX = startX + (50 - startX) * progress;
-              const currentY = startY + (50 - startY) * progress;
+              const currentX = startX + (50 - startX) * enterProgress;
+              const currentY = startY + (50 - startY) * enterProgress;
 
-              return { ...p, x: currentX, y: currentY, opacity: progress < 0.1 ? progress * 10 : 1 };
+              return { ...p, x: currentX, y: currentY, opacity: 1 };
           } else {
               // Standing in room (Jitter slightly based on ID hash to prevent stacking)
               const offset = (parseInt(p.id.slice(-2), 16) % 20) - 10; 
@@ -83,15 +85,18 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
           }
       }
       
-      // 2. Player LEFT this room (isMoving AND previousRoomId == thisRoom)
+      // 2. Player LEFT this room (LEAVING Phase)
       if (p.previousRoomId === room.id && p.isMoving) {
-          // They are LEAVING this room
-          // They go TO currentRoomId
+          // LEAVING Phase (First half of movement)
           const next = map[p.currentRoomId];
           if (!next) return null;
 
           const remaining = Math.max(0, p.moveUnlockTime - now);
-          const progress = 1 - (remaining / MOVEMENT_DELAY);
+          const totalProgress = 1 - (remaining / MOVEMENT_DELAY);
+          
+          // Only render leaving animation during the first half (0.0 -> 0.5)
+          // Map 0.0-0.5 to 0-1 for visual interpolation
+          const leaveProgress = Math.min(1, totalProgress * 2);
 
           let targetX = 50;
           let targetY = 50;
@@ -101,8 +106,8 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
           else if (next.x < cx) { targetX = -20; } // To West
           else if (next.x > cx) { targetX = 120; } // To East
 
-          const currentX = 50 + (targetX - 50) * progress;
-          const currentY = 50 + (targetY - 50) * progress;
+          const currentX = 50 + (targetX - 50) * leaveProgress;
+          const currentY = 50 + (targetY - 50) * leaveProgress;
 
           return { ...p, x: currentX, y: currentY, opacity: 1 };
       }
