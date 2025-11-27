@@ -71,11 +71,9 @@ export default function App() {
                          newState.dmHand.push(drawCard(GAME_DURATION));
                      }
                  }
-                 // Auto-roll dice on start
+                 // Reset interaction time for dice to trigger initial auto-rolls if any
                  newState.players.forEach(p => {
-                    if (p.role === PlayerRole.HERO) {
-                        resolveAutoResources(p);
-                    }
+                    p.dicePool.forEach(d => d.lastInteractionTime = now);
                  });
             } else {
                 // Check readiness
@@ -94,11 +92,9 @@ export default function App() {
                              newState.dmHand.push(drawCard(GAME_DURATION));
                          }
                      }
-                    // Auto-roll dice on start
+                    // Reset interaction time
                     newState.players.forEach(p => {
-                       if (p.role === PlayerRole.HERO) {
-                           resolveAutoResources(p);
-                       }
+                        p.dicePool.forEach(d => d.lastInteractionTime = now);
                     });
                 }
             }
@@ -131,6 +127,37 @@ export default function App() {
             newState.lastCardDrawTick = now;
         }
         
+        // --- Delayed Auto-Roll Logic for Gold/Exp ---
+        newState.players.forEach(p => {
+            if (p.role !== PlayerRole.HERO) return;
+            
+            p.dicePool.forEach(die => {
+                if (die.lockedToObstacleId) return;
+                
+                // If die is GOLD or EXP, check how long it has been sitting there
+                if (die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP) {
+                    const timeOnFace = now - (die.lastInteractionTime || 0);
+                    if (timeOnFace > 1500) { // 1.5 seconds delay for visual feedback
+                        // Process Resource
+                        if (die.currentValue === StatType.GOLD) {
+                            p.gold = (p.gold || 0) + 1;
+                        } else {
+                            p.exp = (p.exp || 0) + 1;
+                            if (p.exp >= 5) {
+                                p.exp -= 5;
+                                p.level++;
+                                p.upgradePoints++;
+                            }
+                        }
+                        // Reroll
+                        die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
+                        die.lastInteractionTime = now; // Reset timer for new face
+                    }
+                }
+            });
+        });
+
+        
         Object.values(newState.map).forEach((room: any) => {
             const playersInRoom = newState.players.some((p: Player) => p.currentRoomId === room.id);
             if (!playersInRoom) {
@@ -158,7 +185,7 @@ export default function App() {
         broadcastState(newState);
         return newState;
     });
-    }, 1000);
+    }, 100); // Increased tick rate slightly for smoother checking
 
     return () => clearInterval(interval);
   }, [gameState.status, isHost]);
@@ -320,6 +347,8 @@ export default function App() {
                 playerToAdd.dicePool.push(generateDraftDie(`d2-late`, 0));
                 playerToAdd.dicePool.push(generateDraftDie(`d3-late`, 1));
                 playerToAdd.inventory = ['ITEM_SCROLL']; 
+                // Set interaction time for new dice
+                playerToAdd.dicePool.forEach(d => d.lastInteractionTime = Date.now());
             }
         }
 
@@ -340,36 +369,6 @@ export default function App() {
         if (isHost) broadcastState(newState);
         return newState;
     });
-  };
-
-  // Helper to auto-use gold/exp dice and reroll them recursively
-  const resolveAutoResources = (player: Player) => {
-      let madeChanges = true;
-      let iterations = 0;
-      // Prevent infinite loop
-      while (madeChanges && iterations < 10) {
-          madeChanges = false;
-          iterations++;
-          
-          player.dicePool.forEach(die => {
-              if (die.lockedToObstacleId) return; // Don't touch locked dice
-
-              if (die.currentValue === StatType.GOLD) {
-                  player.gold = (player.gold || 0) + 1;
-                  die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
-                  madeChanges = true;
-              } else if (die.currentValue === StatType.EXP) {
-                  player.exp = (player.exp || 0) + 1;
-                  if (player.exp >= 5) {
-                      player.exp -= 5;
-                      player.level++;
-                      player.upgradePoints++;
-                  }
-                  die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
-                  madeChanges = true;
-              }
-          });
-      }
   };
 
   const recalculateRoomObstacles = (room: Room, allPlayers: Player[], now: number) => {
@@ -449,11 +448,11 @@ export default function App() {
       const getRoom = (id: string) => draft.map[id];
 
       if (action.type === 'START_GAME') {
+          // Handled in main loop for pregame transition, but this initializes pregame from lobby
           draft.status = 'PREGAME';
           draft.timer = PREGAME_DURATION;
           draft.map = generateMap();
           
-          // Setup DM Draft Options (Start with Basic)
           draft.dmDraftOptions = generateDraftCards('BASIC', 3);
           draft.dmDeck = [];
           draft.dmDeckPointer = 0;
@@ -471,7 +470,8 @@ export default function App() {
                   p.dicePool = generateStarterDice(); // 1 balanced die
                   p.inventory = ['ITEM_SCROLL']; 
                   p.draftStep = 0;
-                  // First draft options (Power 0)
+                  p.dicePool.forEach(d => d.lastInteractionTime = now);
+                  
                   p.draftDieOptions = [
                       generateDraftDie('draft-1', 0),
                       generateDraftDie('draft-2', 0),
@@ -485,12 +485,12 @@ export default function App() {
           if (player && player.role === PlayerRole.HERO && !player.isReady) {
                const selectedDie = player.draftDieOptions[action.dieIndex];
                if (selectedDie) {
-                   const newDie = { ...selectedDie, id: `die-${player.id}-${player.draftStep}-${now}` };
+                   const newDie = { ...selectedDie, id: `die-${player.id}-${player.draftStep}-${now}`, lastInteractionTime: now };
                    player.dicePool.push(newDie);
                    player.draftStep++;
                    
                    // Prepare next step
-                   if (player.draftStep < 2) { // Now only 2 draft steps (Total 3 dice)
+                   if (player.draftStep < 2) { 
                        const powerLevel = player.draftStep; // 0 or 1
                        player.draftDieOptions = [
                           generateDraftDie('draft-1', powerLevel),
@@ -603,43 +603,36 @@ export default function App() {
           const room = player ? getRoom(player.currentRoomId) : null;
           if (player && room && !player.isMoving) {
               const die = player.dicePool[action.dieIndex];
-              // Removed manual GOLD/EXP check here because it's now automatic. 
-              // But keep safety check in case race condition.
-              if (die && (die.currentValue === StatType.GOLD || die.currentValue === StatType.EXP)) {
-                   // Let auto-resolve handle it at end of function
-              } else {
-                  const obstacle = room.activeObstacles.find(o => o.id === action.obstacleId);
+              const obstacle = room.activeObstacles.find(o => o.id === action.obstacleId);
+              
+              if (die && obstacle && !obstacle.isDefeated) {
+                  const faceIndex = die.faces.indexOf(die.currentValue);
+                  const multiplier = die.multipliers[faceIndex] || 1;
                   
-                  if (die && obstacle && !obstacle.isDefeated) {
-                      const faceIndex = die.faces.indexOf(die.currentValue);
-                      const multiplier = die.multipliers[faceIndex] || 1;
-                      
-                      if (obstacle.card.specialRules?.accumulatesDamage) {
-                          const requiredAmount = obstacle.card.requirements[die.currentValue];
-                          if (requiredAmount && requiredAmount > 0) {
-                              let hitPower = multiplier;
-                              if (player.heroClass && CLASS_BONUS[player.heroClass] === die.currentValue) {
-                                  hitPower *= 2; 
-                              }
-                              player.inventory.forEach(itemId => {
-                                  const def = ITEM_REGISTRY[itemId];
-                                  if (def?.bonusStat === die.currentValue) hitPower += (def.bonusAmount || 0);
-                              });
-                              const prev = obstacle.permanentSuccesses[die.currentValue] || 0;
-                              obstacle.permanentSuccesses[die.currentValue] = prev + hitPower;
-                              
-                              // Register visual success for accumulation
-                              room.recentSuccesses = room.recentSuccesses || [];
-                              room.recentSuccesses.push(now);
+                  if (obstacle.card.specialRules?.accumulatesDamage) {
+                      const requiredAmount = obstacle.card.requirements[die.currentValue];
+                      if (requiredAmount && requiredAmount > 0) {
+                          let hitPower = multiplier;
+                          if (player.heroClass && CLASS_BONUS[player.heroClass] === die.currentValue) {
+                              hitPower *= 2; 
                           }
-                          die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
-                          // After rolling, check for resources
-                          resolveAutoResources(player);
-                      } else {
-                          die.lockedToObstacleId = obstacle.id;
+                          player.inventory.forEach(itemId => {
+                              const def = ITEM_REGISTRY[itemId];
+                              if (def?.bonusStat === die.currentValue) hitPower += (def.bonusAmount || 0);
+                          });
+                          const prev = obstacle.permanentSuccesses[die.currentValue] || 0;
+                          obstacle.permanentSuccesses[die.currentValue] = prev + hitPower;
+                          
+                          // Register visual success for accumulation
+                          room.recentSuccesses = room.recentSuccesses || [];
+                          room.recentSuccesses.push(now);
                       }
-                      recalculateRoomObstacles(room, draft.players, now);
+                      die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
+                      die.lastInteractionTime = now;
+                  } else {
+                      die.lockedToObstacleId = obstacle.id;
                   }
+                  recalculateRoomObstacles(room, draft.players, now);
               }
           }
       }
@@ -660,11 +653,10 @@ export default function App() {
               player.dicePool.forEach(die => {
                   if (!die.lockedToObstacleId) {
                       die.currentValue = rollDie(die.faces[Math.floor(Math.random() * 6)]);
+                      die.lastInteractionTime = now;
                   }
               });
               player.lastRerollTime = now;
-              // Check new rolls
-              resolveAutoResources(player);
           }
       }
       else if (action.type === 'UPGRADE_DIE') {
@@ -691,7 +683,7 @@ export default function App() {
                   const def = ITEM_REGISTRY[itemId];
                   if (def?.grantsExtraDie) {
                       player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0)); // Level 0 extra die
-                      resolveAutoResources(player);
+                      player.dicePool[player.dicePool.length-1].lastInteractionTime = now;
                   }
               }
           }
@@ -705,7 +697,7 @@ export default function App() {
                   player.inventory.push(action.itemId);
                   if (def.grantsExtraDie) {
                       player.dicePool.push(generateDraftDie(`die-tool-${player.id}-${now}`, 0));
-                      resolveAutoResources(player);
+                      player.dicePool[player.dicePool.length-1].lastInteractionTime = now;
                   }
               }
           }

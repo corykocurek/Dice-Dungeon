@@ -66,7 +66,7 @@ export const generateDraftDie = (id: string, draftStep: number): Die => {
     }
     
     const currentValue = faces[0];
-    return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+    return { id, faces, multipliers, currentValue, lockedToObstacleId: null, lastInteractionTime: Date.now() };
 };
 
 export const generateDraftCards = (tier: 'BASIC' | 'NEUTRAL' | 'ADVANCED', count: number): ObstacleCard[] => {
@@ -275,7 +275,7 @@ export const generateStandardDie = (id: string): Die => {
   }
   
   const currentValue = faces[Math.floor(Math.random() * faces.length)];
-  return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+  return { id, faces, multipliers, currentValue, lockedToObstacleId: null, lastInteractionTime: Date.now() };
 };
 
 export const generateBalancedDie = (id: string): Die => {
@@ -284,7 +284,7 @@ export const generateBalancedDie = (id: string): Die => {
   const multipliers = [1, 1, 1, 1, 1, 1];
   
   const currentValue = faces[Math.floor(Math.random() * faces.length)];
-  return { id, faces, multipliers, currentValue, lockedToObstacleId: null };
+  return { id, faces, multipliers, currentValue, lockedToObstacleId: null, lastInteractionTime: Date.now() };
 };
 
 export const generateStarterDice = (): Die[] => {

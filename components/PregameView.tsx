@@ -99,7 +99,8 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                             ${selectedIndex === idx ? 'border-yellow-400 ring-2 ring-yellow-400/50' : 'border-slate-600 hover:border-yellow-400 hover:bg-slate-700'}
                                        `}>
                                        
-                                       <div className="w-full grid grid-cols-3 gap-1 md:gap-2">
+                                       {/* Compact Grid for Mobile */}
+                                       <div className="w-fit mx-auto grid grid-cols-3 gap-0.5 md:gap-2 md:w-full">
                                             {die.faces.map((f, i) => (
                                                 <div key={i} className="flex flex-col items-center gap-0.5">
                                                     <div className={`w-8 h-8 md:w-full md:aspect-square rounded border flex items-center justify-center relative bg-slate-900 ${STAT_COLORS[f]}`}>
@@ -112,12 +113,13 @@ export const PregameView: React.FC<PregameProps> = ({ gameState, localPlayer, on
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <span className="text-[6px] uppercase text-slate-400 font-bold tracking-tighter">{f}</span>
+                                                    <span className="text-[6px] uppercase text-slate-400 font-bold tracking-tighter md:hidden">{f}</span>
+                                                    <span className="hidden md:block text-[6px] uppercase text-slate-400 font-bold tracking-tighter">{f}</span>
                                                 </div>
                                             ))}
                                        </div>
                                        <div className="text-[10px] text-slate-400 font-mono mt-2">
-                                           {die.multipliers.filter(m => m > 1).length > 0 ? 'Contains Multipliers!' : 'Standard Die'}
+                                           {die.multipliers.filter(m => m > 1).length > 0 ? 'Multipliers!' : 'Standard'}
                                        </div>
                                   </div>
                               ))

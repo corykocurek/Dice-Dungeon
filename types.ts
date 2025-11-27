@@ -81,6 +81,7 @@ export interface Die {
     multipliers: number[];
     currentValue: StatType;
     lockedToObstacleId: string | null;
+    lastInteractionTime?: number; 
 }
 
 export interface Player {

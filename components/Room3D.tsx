@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { RoomObstacle, StatType, Player, Room, HeroClass } from '../types';
 import { Lock, RefreshCw, Link2, Shield, Zap, Book, Cross, Axe, Music, User } from 'lucide-react';
-import { STAT_BG_COLORS, ITEM_REGISTRY, MOVEMENT_DELAY } from '../constants';
+import { STAT_BG_COLORS, STAT_COLORS, ITEM_REGISTRY, MOVEMENT_DELAY } from '../constants';
 
 interface Room3DProps {
   room: Room;
@@ -155,11 +155,11 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
               {obstacles.length > 0 ? (
                   <div className="absolute inset-0 flex items-center justify-center z-10">
                       {obstacles.map((obs) => (
-                          <div key={obs.id} className="relative w-24 h-24 flex items-center justify-center">
+                          <div key={obs.id} className="relative w-24 h-24 flex items-center justify-center flex-col">
                               {/* Sprite */}
                               <img 
                                   src={obs.card.imageUrl} 
-                                  className="w-full h-full object-contain [image-rendering:pixelated] drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] z-10" 
+                                  className="w-20 h-20 object-contain [image-rendering:pixelated] drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] z-10" 
                               />
                               
                               {/* Status Indicators */}
@@ -169,11 +169,16 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
                                   {obs.card.specialRules?.resetsOnLeave && <div className="bg-black/50 p-1 rounded-full border border-purple-500"><RefreshCw className="w-3 h-3 text-purple-500" /></div>}
                               </div>
 
-                              {/* Progress Overlay (if multiple requirements) */}
+                              {/* Progress Overlay (Detailed Pills) */}
                               {!obs.card.keyRequirement && !obs.isDefeated && (
-                                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-0.5">
+                                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 min-w-[80px]">
                                       {Object.keys(obs.card.requirements).map((stat, i) => (
-                                          <div key={i} className={`w-2 h-2 rounded-full ${STAT_BG_COLORS[stat as StatType]}`}></div>
+                                          <div key={i} className="flex gap-1 items-center bg-black/60 px-1 rounded border border-white/20">
+                                               <div className={`w-1.5 h-1.5 rounded-full ${STAT_BG_COLORS[stat as StatType]}`}></div>
+                                               <span className={`text-[8px] font-mono ${STAT_COLORS[stat as StatType].split(' ')[0]}`}>
+                                                   {obs.card.requirements[stat as StatType]} {stat}
+                                               </span>
+                                          </div>
                                       ))}
                                   </div>
                               )}
@@ -199,11 +204,11 @@ export const Room3D: React.FC<Room3DProps> = ({ room, allPlayers, map, obstacles
                                   opacity: p.opacity
                               }}
                           >
-                              <div className={`w-8 h-8 rounded-full bg-slate-900 border-2 ${p.role === 'DM' ? 'border-red-500' : 'border-blue-400'} flex items-center justify-center shadow-lg relative`}>
+                              <div className={`w-8 h-8 rounded-full bg-slate-900 border-2 ${p.role === 'DM' ? 'border-red-500' : 'border-blue-400'} flex items-center justify-center shadow-lg relative shrink-0`}>
                                   <Icon className="w-5 h-5 text-slate-200" />
                                   <div className="absolute -bottom-1 w-2 h-2 bg-green-500 rounded-full border border-black animate-pulse"></div>
                               </div>
-                              <div className="bg-black/70 px-1 rounded text-[6px] text-white mt-1 whitespace-nowrap">{p.name}</div>
+                              <div className="absolute top-full mt-1 bg-black/70 px-1 rounded text-[6px] text-white whitespace-nowrap">{p.name}</div>
                           </div>
                       )
                   })}
