@@ -154,7 +154,7 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
 
                                 <div className={`
                                     absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                                    w-[70%] h-[70%] z-20 rounded-sm transition-colors flex items-center justify-center
+                                    w-[70%] h-[70%] z-20 rounded-sm transition-colors flex items-center justify-center overflow-hidden
                                     ${roomBg}
                                     ${hasTraps && !isBlocked ? 'border border-red-500' : ''}
                                     ${isSelected ? 'ring-2 ring-yellow-400' : ''}
@@ -162,6 +162,20 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                 `}>
                                     {room.isStart && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-green-300">START</span>}
                                     {room.isExit && playersInRoom.length === 0 && <span className="text-[6px] sm:text-[8px] font-bold text-yellow-300">EXIT</span>}
+                                    
+                                    {/* DM Map: Show Obstacle Sprite */}
+                                    {hasTraps && playersInRoom.length === 0 && (
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-80">
+                                            {room.activeObstacles.map(obs => (
+                                                <img 
+                                                    key={obs.id} 
+                                                    src={obs.card.imageUrl} 
+                                                    className="w-full h-full object-contain [image-rendering:pixelated]"
+                                                    alt="Trap"
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
@@ -179,14 +193,6 @@ export const DungeonMasterView: React.FC<DMProps> = ({ gameState, onPlaceCard, o
                                                      </div>
                                                  );
                                              })}
-                                         </div>
-                                     )}
-
-                                     {hasTraps && playersInRoom.length === 0 && (
-                                         <div className="absolute bottom-1 right-1 flex gap-0.5">
-                                             {room.activeObstacles.map(obs => (
-                                                 <div key={obs.id} className={`w-1.5 h-1.5 rounded-sm ${obs.isDefeated ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                             ))}
                                          </div>
                                      )}
                                      

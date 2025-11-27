@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useRef } from 'react';
 import { GameState, Player, Room, Die, StatType, RoomObstacle, HeroClass } from '../types';
 import { Room3D } from './Room3D';
@@ -53,37 +52,6 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   
   // Reroll Cooldown Timer
   const [rerollCooldownRemaining, setRerollCooldownRemaining] = useState(0);
-
-  // Calculate Movement Timer
-  const [moveProgress, setMoveProgress] = useState(0);
-  
-  // Determine travel direction
-  const [travelDir, setTravelDir] = useState<'N' | 'S' | 'E' | 'W' | null>(null);
-
-  useEffect(() => {
-    let interval: any;
-    if (player.isMoving) {
-      if (player.previousRoomId && player.currentRoomId) {
-          const [px, py] = player.previousRoomId.split(',').map(Number);
-          const [cx, cy] = player.currentRoomId.split(',').map(Number);
-          if (cx > px) setTravelDir('E');
-          else if (cx < px) setTravelDir('W');
-          else if (cy > py) setTravelDir('S');
-          else if (cy < py) setTravelDir('N');
-      }
-      
-      interval = setInterval(() => {
-        const remaining = player.moveUnlockTime - Date.now();
-        const elapsed = MOVEMENT_DELAY - remaining;
-        const prog = Math.min(100, (elapsed / MOVEMENT_DELAY) * 100);
-        setMoveProgress(prog);
-      }, 100);
-    } else {
-      if (moveProgress !== 0) setMoveProgress(0);
-      setTravelDir(null);
-    }
-    return () => clearInterval(interval);
-  }, [player.isMoving, player.moveUnlockTime, player.currentRoomId, player.previousRoomId]);
 
   useEffect(() => {
       const interval = setInterval(() => {
@@ -271,8 +239,6 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   
   // Render Mini-Map: Current room + immediate neighbors
   const renderMiniMap = () => {
-      if (player.isMoving) return null;
-      
       const cx = currentRoom.x;
       const cy = currentRoom.y;
       
@@ -323,23 +289,19 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
   return (
     <div className="flex flex-col h-dvh bg-slate-900 text-slate-200 overflow-hidden">
       
-      {/* 3D Viewport */}
+      {/* 3D (Now Top Down) Viewport */}
       <div className="relative h-[40vh] md:flex-1 bg-black shrink-0 perspective-container">
         
-        {!player.isMoving ? (
-             <Room3D 
-                obstacles={activeObstacles} 
-                isExit={currentRoom.isExit}
-                isStart={currentRoom.isStart}
-                items={currentRoom.items}
-                className="h-full"
-            />
-        ) : (
-             <div className="absolute inset-0 z-10 bg-black flex flex-col items-center justify-center overflow-hidden">
-                 <div className="absolute inset-0 h-1/2 -top-10 grid-ceiling opacity-40"></div>
-                 <div className="absolute inset-0 h-1/2 top-1/2 grid-floor opacity-60"></div>
-             </div>
-        )}
+        <Room3D 
+            room={currentRoom}
+            allPlayers={gameState.players}
+            map={gameState.map}
+            obstacles={activeObstacles} 
+            isExit={currentRoom.isExit}
+            isStart={currentRoom.isStart}
+            items={currentRoom.items}
+            className="h-full"
+        />
         
         {/* HUD Overlay - Top */}
         <div className="absolute top-4 left-4 right-4 flex justify-between pointer-events-none z-40">
@@ -468,26 +430,6 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
                 </div>
             </div>
         )}
-
-        {/* Movement Overlay */}
-        {player.isMoving && (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 gap-8 pointer-events-none">
-                <div className="bg-slate-900/80 p-6 border-2 border-slate-500 flex flex-col items-center gap-4 backdrop-blur shadow-2xl">
-                    <div className="text-2xl font-retro text-yellow-400 animate-pulse text-center drop-shadow-md">TRAVELING...</div>
-                    <div className="w-64 h-6 border-2 border-slate-500 p-1 bg-black">
-                        <div className="h-full bg-blue-500 transition-all duration-100" style={{ width: `${moveProgress}%` }}></div>
-                    </div>
-                    {travelDir && (
-                         <div className="flex items-center justify-center">
-                             {travelDir === 'N' && <ArrowUp className="w-12 h-12 text-yellow-400 animate-bounce" />}
-                             {travelDir === 'S' && <ArrowDown className="w-12 h-12 text-yellow-400 animate-bounce" />}
-                             {travelDir === 'E' && <ArrowRight className="w-12 h-12 text-yellow-400 animate-bounce" />}
-                             {travelDir === 'W' && <ArrowLeft className="w-12 h-12 text-yellow-400 animate-bounce" />}
-                         </div>
-                    )}
-                </div>
-            </div>
-        )}
       </div>
 
       {/* ENCOUNTER BAR - BETWEEN VIEWPORT AND CONTROLS */}
@@ -541,10 +483,10 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
       <div className="flex-1 bg-slate-900 border-t-4 border-slate-700 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto md:overflow-hidden">
         
         {/* Left: Stats & Dice & Inventory - Prioritized on Mobile with Fixed Height */}
-        <div className="bg-slate-900 border-4 double border-slate-600 p-4 relative shadow-lg flex flex-col overflow-visible shrink-0 h-auto min-h-[200px] mt-6 md:mt-0 md:h-full md:w-1/2">
+        <div className="bg-slate-900 border-4 double border-slate-600 p-4 relative shadow-lg flex flex-col shrink-0 min-h-[300px] md:h-full md:w-1/2 overflow-y-auto">
             
             {/* Tabs */}
-            <div className="flex gap-1 absolute -top-4 left-4 z-10">
+            <div className="flex gap-1 sticky top-0 z-10 bg-slate-900 pb-2 border-b border-slate-700 mb-2">
                 <button 
                     onClick={() => setActiveTab('DICE')}
                     className={`px-3 py-1 text-sm border-t border-l border-r font-bold transition-colors flex items-center gap-2
@@ -570,10 +512,10 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
             {/* Tab Content: DICE */}
             {activeTab === 'DICE' && (
-                <div className="flex flex-col pt-2 min-h-0 flex-1">
+                <div className="flex flex-col flex-1">
                     {/* Sub-mode: ROLL View */}
                     {diceMode === 'ROLL' && (
-                        <div className="flex flex-row overflow-x-auto gap-2 pb-2 items-start min-h-[100px]">
+                        <div className="flex flex-row flex-wrap gap-2 pb-2 items-start">
                             {player.dicePool.map((die, idx) => {
                                 const isLocked = !!die.lockedToObstacleId;
                                 // Effective if obstacle has this req OR is Gold/Exp die (always effective self-use)
@@ -622,7 +564,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
                     {/* Sub-mode: SIDES View */}
                     {diceMode === 'SIDES' && (
-                        <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
+                        <div className="flex-1 space-y-4 pr-1">
                             {player.dicePool.map((die, dieIdx) => (
                                 <div key={die.id} className="bg-slate-950 p-2 border border-slate-700">
                                      <div className="text-[10px] text-slate-500 mb-1">DICE {dieIdx + 1}</div>
@@ -697,7 +639,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
 
             {/* Tab Content: ITEMS */}
             {activeTab === 'ITEMS' && (
-                 <div className="flex flex-col flex-1 pt-2 overflow-y-auto min-h-0">
+                 <div className="flex flex-col flex-1 pt-2">
                     {player.inventory.length === 0 && (
                         <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm">
                             No items collected...
@@ -767,7 +709,7 @@ export const HeroView: React.FC<HeroProps> = ({ gameState, player, onMove, onRol
         </div>
 
         {/* Center: Interaction / Log */}
-        <Panel className="flex flex-col relative shrink-0 min-h-[200px] md:flex-1 md:h-full md:min-h-0">
+        <Panel className="flex flex-col relative shrink-0 min-h-[200px] md:flex-1 md:h-full md:min-h-0 overflow-hidden">
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 mb-2">
                 {combatLog.length === 0 && <div className="text-slate-600 italic">It is quiet... too quiet.</div>}
                 {combatLog.map((log, i) => (
